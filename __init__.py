@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Procedural Ship Generator",
     "author": "Jarvis",
-    "version": (1, 10, 22),
+    "version": (1, 10, 24),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > Procedural Ship",
     "description": "Generador de barcos D&D modulares, paramétricos y listos para FDM.",

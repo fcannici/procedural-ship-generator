@@ -787,8 +787,8 @@ def rebuild_ship_mesh(obj):
                     y_fr = -l2 + t * (2 * l2)
                     x_fr = 0.0
             
-            # Center the back railing on the back wall (thickness = 1.2, center = 0.6)
-            trim_s = 0.6 if props.section_type == 'STERN' else 0.0
+            # Center the back railing on the back wall (thickness = 1.2, move inward 1.5 = 2.1)
+            trim_s = 2.1 if props.section_type == 'STERN' else 0.0
             trim_e = 0.0
             
             if props.section_type == 'BOW':
@@ -804,7 +804,7 @@ def rebuild_ship_mesh(obj):
             add_railing_line(bm_final, x_bl, -l2, x_fl, y_fl, h, trim_start=trim_s, trim_end=trim_e)
             add_railing_line(bm_final, x_br, -l2, x_fr, y_fr, h, trim_start=trim_s, trim_end=trim_e)
             if props.section_type == 'STERN':
-                add_railing_line(bm_final, x_br, -l2 + 0.6, x_bl, -l2 + 0.6, h, is_back=True)
+                add_railing_line(bm_final, x_br, -l2 + 2.1, x_bl, -l2 + 2.1, h, is_back=True)
                 
         if getattr(props, 'has_mast', False):
             sock_h = getattr(props, 'mast_socket_height', 15.0)

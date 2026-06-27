@@ -9,8 +9,8 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         
-        layout.operator("object.generate_ship_section", text="Generar Sección Nueva", icon='MESH_CUBE')
-        layout.operator("object.generate_full_ship", text="Generar Barco Completo", icon='GROUP')
+        layout.operator("object.generate_ship_section", text="Agregar Sección Extra (Centro)", icon='MESH_CUBE')
+        layout.operator("object.generate_full_ship", text="Generar Barco Inicial (3 Partes)", icon='GROUP')
         layout.operator("object.generate_connector_clip", text="Generar Clip de Unión", icon='LINKED')
         
         obj = context.active_object
@@ -91,7 +91,7 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
 
 class OBJECT_OT_generate_ship_section(bpy.types.Operator):
     bl_idname = "object.generate_ship_section"
-    bl_label = "Generar Sección de Barco"
+    bl_label = "Agregar Sección Extra (Centro)"
     bl_description = "Crea un nuevo objeto de sección de barco procedural"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -115,25 +115,12 @@ class OBJECT_OT_generate_ship_section(bpy.types.Operator):
         existing = [o for o in context.view_layer.objects if o != obj and hasattr(o, 'ship_generator') and o.ship_generator.is_ship]
         if existing:
             src = next((o for o in existing if o.ship_generator.section_type == 'MID'), existing[0])
-            s_props = src.ship_generator
-            t_props = obj.ship_generator
-            
-            t_props.tiles_width = s_props.tiles_width
-            t_props.wall_height = s_props.wall_height
-            t_props.wall_thickness = s_props.wall_thickness
-            t_props.floor_thickness = s_props.floor_thickness
-            t_props.has_grid = s_props.has_grid
-            t_props.tolerance = s_props.tolerance
-            t_props.generate_top_deck = s_props.generate_top_deck
-            t_props.tiles_length = s_props.tiles_length
-            t_props.plank_height = s_props.plank_height
-            t_props.lapstrake_depth = s_props.lapstrake_depth
-            t_props.generate_plank_cuts = s_props.generate_plank_cuts
-            t_props.plank_cut_width = s_props.plank_cut_width
-            t_props.plank_cut_density = s_props.plank_cut_density
-            t_props.generate_floor_planks = s_props.generate_floor_planks
-            t_props.floor_plank_width = s_props.floor_plank_width
-            t_props.floor_plank_length = s_props.floor_plank_length
+            for k, v in src.ship_generator.items():
+                if k not in ['name', 'section_type']:
+                    try:
+                        obj.ship_generator[k] = v
+                    except:
+                        pass
         
         # Trigger the first generation
         from .ship_generator import rebuild_ship_mesh
@@ -146,7 +133,7 @@ class OBJECT_OT_generate_ship_section(bpy.types.Operator):
 
 class OBJECT_OT_generate_full_ship(bpy.types.Operator):
     bl_idname = "object.generate_full_ship"
-    bl_label = "Generar Barco Completo"
+    bl_label = "Generar Barco Inicial (3 Partes)"
     bl_description = "Genera Proa, Centro y Popa perfectamente alineados"
     bl_options = {'REGISTER', 'UNDO'}
 
