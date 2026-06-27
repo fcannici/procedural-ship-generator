@@ -14,27 +14,65 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
         layout.operator("object.generate_connector_clip", text="Generar Clip de Unión", icon='LINKED')
         
         obj = context.active_object
-        if obj and (obj.ship_generator.is_ship or obj.ship_generator.is_connector_clip):
+        if obj is not None and obj.type == 'MESH' and hasattr(obj, "ship_generator"):
             props = obj.ship_generator
-            
-            if obj.ship_generator.is_ship:
+            if props.is_ship:
+                
                 box = layout.box()
-                box.label(text="Configuración Paramétrica", icon='MODIFIER')
+                box.label(text="Dimensiones Base", icon='OBJECT_DATA')
                 box.prop(props, "section_type")
                 box.prop(props, "tiles_length")
                 box.prop(props, "tiles_width")
                 box.prop(props, "wall_height")
                 
                 box = layout.box()
-                box.label(text="Arquitectura Multinivel", icon='OUTLINER_OB_LATTICE')
+                box.label(text="Textura de Casco (Tablones)", icon='TEXTURE')
+                box.prop(props, "plank_height")
+                box.prop(props, "lapstrake_depth")
+                
+                box = layout.box()
+                box.label(text="Textura de Cubierta (Piso)", icon='MATPLANE')
+                box.prop(props, "generate_floor_planks")
+                if props.generate_floor_planks:
+                    box.prop(props, "floor_plank_width")
+                    box.prop(props, "floor_plank_length")
+                
+                box = layout.box()
+                box.label(text="Arquitectura Multinivel", icon='GROUP_VERTEX')
                 if props.section_type == 'STERN':
                     box.prop(props, "has_quarterdeck")
                 elif props.section_type == 'BOW':
                     box.prop(props, "has_forecastle")
+                box.prop(props, "generate_stairs")
+                if props.generate_stairs:
+                    box.prop(props, "stairs_offset_x")
+                    box.prop(props, "stairs_offset_y")
+                    box.prop(props, "stairs_width")
+                    box.prop(props, "stairs_length")
                     
-                if (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle):
+                if props.has_quarterdeck or props.has_forecastle:
                     box.prop(props, "deck_elevation")
-                    box.prop(props, "generate_stairs")
+                
+                box = layout.box()
+                box.label(text="Barandas", icon='MOD_WIREFRAME')
+                box.prop(props, "generate_railings")
+                if props.generate_railings:
+                    box.prop(props, "railing_height")
+                    box.prop(props, "railing_thickness")
+                    box.prop(props, "railing_offset_inward")
+                    box.prop(props, "railing_spacing")
+                
+                box = layout.box()
+                box.label(text="Accesorios Funcionales", icon='MOD_BOOLEAN')
+                box.prop(props, "has_mast")
+                if props.has_mast:
+                    box.prop(props, "mast_diameter")
+                    box.prop(props, "mast_socket_height")
+                    box.prop(props, "mast_y_offset")
+                box.prop(props, "has_trapdoor")
+                if props.has_trapdoor:
+                    box.prop(props, "trapdoor_size")
+                    box.prop(props, "trapdoor_y_offset")
                 
                 box = layout.box()
                 box.label(text="Impresión FDM", icon='MESH_DATA')
@@ -70,12 +108,39 @@ class OBJECT_OT_generate_ship_section(bpy.types.Operator):
         obj.select_set(True)
         context.view_layer.objects.active = obj
         
-        # Mark it as a ship and trigger the first generation
+        # Mark it as a ship
         obj.ship_generator.is_ship = True
         
-        # Force an update by touching a property
+        # Inherit settings from an existing ship piece if one exists
+        existing = [o for o in context.view_layer.objects if o != obj and hasattr(o, 'ship_generator') and o.ship_generator.is_ship]
+        if existing:
+            src = next((o for o in existing if o.ship_generator.section_type == 'MID'), existing[0])
+            s_props = src.ship_generator
+            t_props = obj.ship_generator
+            
+            t_props.tiles_width = s_props.tiles_width
+            t_props.wall_height = s_props.wall_height
+            t_props.wall_thickness = s_props.wall_thickness
+            t_props.floor_thickness = s_props.floor_thickness
+            t_props.has_grid = s_props.has_grid
+            t_props.tolerance = s_props.tolerance
+            t_props.generate_top_deck = s_props.generate_top_deck
+            t_props.tiles_length = s_props.tiles_length
+            t_props.plank_height = s_props.plank_height
+            t_props.lapstrake_depth = s_props.lapstrake_depth
+            t_props.generate_plank_cuts = s_props.generate_plank_cuts
+            t_props.plank_cut_width = s_props.plank_cut_width
+            t_props.plank_cut_density = s_props.plank_cut_density
+            t_props.generate_floor_planks = s_props.generate_floor_planks
+            t_props.floor_plank_width = s_props.floor_plank_width
+            t_props.floor_plank_length = s_props.floor_plank_length
+        
+        # Trigger the first generation
         from .ship_generator import rebuild_ship_mesh
         rebuild_ship_mesh(obj)
+        
+        from .ship_properties import _realign_ship
+        _realign_ship(context)
         
         return {'FINISHED'}
 
@@ -88,10 +153,20 @@ class OBJECT_OT_generate_full_ship(bpy.types.Operator):
     def execute(self, context):
         from .ship_generator import rebuild_ship_mesh
         
-        def make_section(name, stype, y_offset):
+        def make_section(name, stype, y_offset, source_obj=None):
             mesh = bpy.data.meshes.new(name + "_Mesh")
             obj = bpy.data.objects.new(name, mesh)
             context.collection.objects.link(obj)
+            
+            if source_obj and source_obj.ship_generator.is_ship:
+                # Copy properties
+                for k, v in source_obj.ship_generator.items():
+                    if k not in ['name', 'section_type']:
+                        try:
+                            obj.ship_generator[k] = v
+                        except:
+                            pass
+                            
             obj.ship_generator.is_ship = True
             obj.ship_generator.section_type = stype
             obj.location = (0, y_offset, 0)
@@ -107,9 +182,9 @@ class OBJECT_OT_generate_full_ship(bpy.types.Operator):
         
         physical_length = tiles_len * 25.4
         
-        make_section("Popa", 'STERN', -physical_length)
-        mid = make_section("Centro", 'MID', 0)
-        make_section("Proa", 'BOW', physical_length)
+        make_section("Popa", 'STERN', -physical_length, active)
+        mid = make_section("Centro", 'MID', 0, active)
+        make_section("Proa", 'BOW', physical_length, active)
         
         mid.select_set(True)
         context.view_layer.objects.active = mid
@@ -152,3 +227,4 @@ def register():
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+

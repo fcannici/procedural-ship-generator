@@ -2,66 +2,93 @@ import bpy
 
 _updating_all = False
 
-def _sync_and_realign_ship(self, context):
-    global _updating_all
-    if _updating_all:
+def _realign_ship(context):
+    bows = []
+    mids = []
+    sterns = []
+    
+    for o in list(context.view_layer.objects):
+        if o and o.type == 'MESH' and hasattr(o, 'ship_generator') and o.ship_generator.is_ship:
+            t = o.ship_generator.section_type
+            if t == 'BOW': bows.append(o)
+            elif t == 'MID': mids.append(o)
+            elif t == 'STERN': sterns.append(o)
+            
+    if not (bows or mids or sterns):
         return
         
-    _updating_all = True
-    try:
-        obj = self.id_data
+    bows.sort(key=lambda x: x.location.y, reverse=True)
+    mids.sort(key=lambda x: x.location.y, reverse=True)
+    sterns.sort(key=lambda x: x.location.y, reverse=True)
+    
+    sequence = bows + mids + sterns
+    
+    if mids:
+        anchor = mids[0]
+    elif bows:
+        anchor = bows[0]
+    else:
+        anchor = sterns[0]
         
-        # Primero, sincronizar propiedades
-        for other in context.view_layer.objects:
-            if other != obj and other.type == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
-                props = other.ship_generator
-                props.tiles_length = self.tiles_length
-                props.tiles_width = self.tiles_width
-                props.wall_height = self.wall_height
-                props.wall_thickness = self.wall_thickness
-                props.floor_thickness = self.floor_thickness
-                props.has_grid = self.has_grid
-                props.generate_top_deck = self.generate_top_deck
-                props.tolerance = self.tolerance
-                
-        # Segundo, realinear posiciones
-        mid = None
-        bows = []
-        sterns = []
+    grid_size = 25.4
+    anchor_idx = sequence.index(anchor)
+    
+    current_y = anchor.location.y + (anchor.ship_generator.tiles_length * grid_size) / 2.0
+    for i in range(anchor_idx - 1, -1, -1):
+        obj = sequence[i]
+        l = obj.ship_generator.tiles_length * grid_size
+        obj.location.y = current_y + l / 2.0
+        current_y += l
         
-        for o in context.view_layer.objects:
-            if o.type == 'MESH' and hasattr(o, 'ship_generator') and o.ship_generator.is_ship:
-                if o.ship_generator.section_type == 'MID':
-                    mid = o
-                elif o.ship_generator.section_type == 'BOW':
-                    bows.append(o)
-                elif o.ship_generator.section_type == 'STERN':
-                    sterns.append(o)
-                    
-        if mid:
-            grid_size = 25.4
-            mid_len = mid.ship_generator.tiles_length * grid_size
-            
-            for bow in bows:
-                bow_len = bow.ship_generator.tiles_length * grid_size
-                bow.location.y = mid.location.y + (mid_len / 2.0) + (bow_len / 2.0)
-                
-            for stern in sterns:
-                stern_len = stern.ship_generator.tiles_length * grid_size
-                stern.location.y = mid.location.y - (mid_len / 2.0) - (stern_len / 2.0)
-                
-    finally:
-        _updating_all = False
+    current_y = anchor.location.y - (anchor.ship_generator.tiles_length * grid_size) / 2.0
+    for i in range(anchor_idx + 1, len(sequence)):
+        obj = sequence[i]
+        l = obj.ship_generator.tiles_length * grid_size
+        obj.location.y = current_y - l / 2.0
+        current_y -= l
 
-def update_ship_geometry(self, context):
-    # This prevents the rebuild from running recursively or on undo if we aren't careful,
-    # but for parametric objects, we usually want it to just call the generator.
-    # To avoid circular imports, we import the generator function here.
+def update_no_sync(self, context):
     from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
     if obj and obj.type == 'MESH':
         rebuild_ship_mesh(obj)
-        _sync_and_realign_ship(self, context)
+    _realign_ship(context)
+
+def _sync_prop(self, context, prop_name):
+    global _updating_all
+    from .ship_generator import rebuild_ship_mesh
+    obj = self.id_data
+    
+    if not _updating_all:
+        _updating_all = True
+        try:
+            val = getattr(self, prop_name)
+            for other in list(context.view_layer.objects):
+                if other and other != obj and other.type == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
+                    setattr(other.ship_generator, prop_name, val)
+                    rebuild_ship_mesh(other)
+        finally:
+            _updating_all = False
+            
+    if obj and obj.type == 'MESH':
+        rebuild_ship_mesh(obj)
+    _realign_ship(context)
+
+def update_tiles_width(self, context): _sync_prop(self, context, 'tiles_width')
+def update_wall_height(self, context): _sync_prop(self, context, 'wall_height')
+def update_wall_thickness(self, context): _sync_prop(self, context, 'wall_thickness')
+def update_floor_thickness(self, context): _sync_prop(self, context, 'floor_thickness')
+def update_has_grid(self, context): _sync_prop(self, context, 'has_grid')
+def update_tolerance(self, context): _sync_prop(self, context, 'tolerance')
+def update_plank_height(self, context): _sync_prop(self, context, 'plank_height')
+def update_lapstrake_depth(self, context): _sync_prop(self, context, 'lapstrake_depth')
+def update_generate_plank_cuts(self, context): _sync_prop(self, context, 'generate_plank_cuts')
+def update_plank_cut_width(self, context): _sync_prop(self, context, 'plank_cut_width')
+def update_plank_cut_density(self, context): _sync_prop(self, context, 'plank_cut_density')
+
+def update_generate_floor_planks(self, context): _sync_prop(self, context, 'generate_floor_planks')
+def update_floor_plank_width(self, context): _sync_prop(self, context, 'floor_plank_width')
+def update_floor_plank_length(self, context): _sync_prop(self, context, 'floor_plank_length')
 
 class ShipGeneratorProperties(bpy.types.PropertyGroup):
     is_ship: bpy.props.BoolProperty(
@@ -83,7 +110,7 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
             ('STERN', "Popa", "Parte trasera del barco")
         ],
         default='MID',
-        update=update_ship_geometry
+        update=update_no_sync
     )
     
     tiles_length: bpy.props.FloatProperty(
@@ -92,7 +119,7 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         default=4.0,
         min=1.0,
         step=50,
-        update=update_ship_geometry
+        update=update_no_sync
     )
     
     tiles_width: bpy.props.FloatProperty(
@@ -101,7 +128,7 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         default=4.0,
         min=2.0,
         step=50,
-        update=update_ship_geometry
+        update=update_tiles_width
     )
     
     wall_height: bpy.props.FloatProperty(
@@ -109,7 +136,7 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         description="Altura de las paredes del casco",
         default=40.0,
         min=10.0,
-        update=update_ship_geometry
+        update=update_wall_height
     )
     
     wall_thickness: bpy.props.FloatProperty(
@@ -117,21 +144,21 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         description="Grosor de las paredes para impresión 3D",
         default=5.0,
         min=1.0,
-        update=update_ship_geometry
+        update=update_wall_thickness
     )
     
     has_quarterdeck: bpy.props.BoolProperty(
         name="Castillo de Popa",
         description="Eleva la cubierta trasera para crear un cuarto de mando",
         default=False,
-        update=update_ship_geometry
+        update=update_no_sync
     )
     
     has_forecastle: bpy.props.BoolProperty(
         name="Castillo de Proa",
         description="Eleva la cubierta delantera",
         default=False,
-        update=update_ship_geometry
+        update=update_no_sync
     )
     
     deck_elevation: bpy.props.FloatProperty(
@@ -139,14 +166,40 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         description="Altura adicional para los castillos",
         default=25.0,
         min=10.0,
-        update=update_ship_geometry
+        update=update_no_sync
     )
     
     generate_stairs: bpy.props.BoolProperty(
         name="Generar Escaleras",
         description="Añade escaleras integradas a los castillos para las miniaturas",
         default=True,
-        update=update_ship_geometry
+        update=update_no_sync
+    )
+    stairs_offset_x: bpy.props.FloatProperty(
+        name="Offset X Escalera",
+        description="Mueve las escaleras lateralmente",
+        default=0.0,
+        update=update_no_sync
+    )
+    stairs_offset_y: bpy.props.FloatProperty(
+        name="Offset Y Escalera",
+        description="Mueve las escaleras longitudinalmente",
+        default=0.0,
+        update=update_no_sync
+    )
+    stairs_length: bpy.props.FloatProperty(
+        name="Largo Escalera",
+        description="Define qué tan lejos llegan los escalones",
+        default=40.0,
+        min=5.0,
+        update=update_no_sync
+    )
+    stairs_width: bpy.props.FloatProperty(
+        name="Ancho Escalera",
+        description="Define el ancho de la escalera",
+        default=20.0,
+        min=5.0,
+        update=update_no_sync
     )
     
     floor_thickness: bpy.props.FloatProperty(
@@ -154,21 +207,21 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         description="Grosor sólido del piso en mm",
         default=6.0,
         min=1.0,
-        update=update_ship_geometry
+        update=update_floor_thickness
     )
     
     has_grid: bpy.props.BoolProperty(
         name="Generar Cuadrícula",
         description="Esculpe una cuadrícula de 1 pulgada en el suelo",
         default=True,
-        update=update_ship_geometry
+        update=update_has_grid
     )
     
     generate_top_deck: bpy.props.BoolProperty(
         name="Cubierta Removible",
         description="Genera la tapa superior como geometría adicional",
         default=True,
-        update=update_ship_geometry
+        update=update_no_sync
     )
     
     tolerance: bpy.props.FloatProperty(
@@ -178,7 +231,163 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         min=0.0,
         step=1,
         precision=2,
-        update=update_ship_geometry
+        update=update_tolerance
+    )
+    
+    plank_height: bpy.props.FloatProperty(
+        name="Alto de Tablón",
+        description="Altura de cada tablón horizontal en el casco",
+        default=8.0,
+        min=2.0,
+        update=update_plank_height
+    )
+    
+    lapstrake_depth: bpy.props.FloatProperty(
+        name="Profundidad de Relieve",
+        description="Profundidad del solapamiento entre tablones (Tingladillo)",
+        default=1.5,
+        min=0.0,
+        update=update_lapstrake_depth
+    )
+    
+    generate_plank_cuts: bpy.props.BoolProperty(
+        name="Cortes Verticales",
+        description="Genera cortes aleatorios para simular tablones individuales de distintos largos",
+        default=False,
+        update=update_generate_plank_cuts
+    )
+    
+    plank_cut_width: bpy.props.FloatProperty(
+        name="Grosor del Corte",
+        description="Ancho de la hendidura vertical entre tablones",
+        default=1.5,
+        min=0.1,
+        update=update_plank_cut_width
+    )
+    
+    plank_cut_density: bpy.props.FloatProperty(
+        name="Densidad de Cortes",
+        description="Probabilidad de cortes (0 = tablones infinitos, 1 = fragmentados)",
+        default=0.3,
+        min=0.0,
+        max=1.0,
+        update=update_plank_cut_density
+    )
+
+    generate_floor_planks: bpy.props.BoolProperty(
+        name="Tablones en el Piso",
+        description="Genera textura de tablones separados en la cubierta",
+        default=True,
+        update=update_generate_floor_planks
+    )
+    
+    floor_plank_width: bpy.props.FloatProperty(
+        name="Ancho de Tablones (Piso)",
+        description="Ancho de cada tabla del piso (eje X)",
+        default=10.0,
+        min=2.0,
+        update=update_floor_plank_width
+    )
+    
+    floor_plank_length: bpy.props.FloatProperty(
+        name="Largo Medio (Piso)",
+        description="Largo promedio de los tablones del piso (eje Y)",
+        default=40.0,
+        min=5.0,
+        update=update_floor_plank_length
+    )
+
+    # --- ACCESORIOS FUNCIONALES (FASE 4) ---
+    has_mast: bpy.props.BoolProperty(
+        name="Zócalo para Mástil",
+        description="Genera un zócalo con orificio para insertar un mástil",
+        default=False,
+        update=update_no_sync
+    )
+    
+    mast_diameter: bpy.props.FloatProperty(
+        name="Diámetro del Mástil",
+        description="Diámetro del agujero interno para el mástil (mm)",
+        default=8.0,
+        min=2.0,
+        update=update_no_sync
+    )
+    
+    mast_socket_height: bpy.props.FloatProperty(
+        name="Altura del Zócalo",
+        description="Altura del anillo de soporte del mástil sobre el piso (mm)",
+        default=15.0,
+        min=2.0,
+        update=update_no_sync
+    )
+    
+    mast_y_offset: bpy.props.FloatProperty(
+        name="Desplazamiento Y (Mástil)",
+        description="Desplaza el mástil hacia adelante o atrás",
+        default=0.0,
+        update=update_no_sync
+    )
+    
+    generate_railings: bpy.props.BoolProperty(
+        name="Generar Barandas",
+        description="Genera barandas en la cubierta superior o en los bordes",
+        default=True,
+        update=update_no_sync
+    )
+    
+    railing_height: bpy.props.FloatProperty(
+        name="Altura de Baranda",
+        description="Altura de la baranda en mm",
+        default=12.0,
+        min=5.0,
+        update=update_no_sync
+    )
+    
+    railing_thickness: bpy.props.FloatProperty(
+        name="Grosor de Baranda",
+        description="Grosor estructural de la baranda (ideal 2-3mm para FDM)",
+        default=2.5,
+        min=1.0,
+        update=update_no_sync
+    )
+    
+    railing_offset_inward: bpy.props.FloatProperty(
+        name="Desplazamiento al Centro",
+        description="Mueve las barandas hacia el centro para evitar que sobresalgan del casco",
+        default=0.5,
+        min=0.0,
+        max=5.0,
+        update=update_no_sync
+    )
+    
+    railing_spacing: bpy.props.FloatProperty(
+        name="Espaciado de Postes",
+        description="Distancia entre postes verticales en mm",
+        default=20.0,
+        min=5.0,
+        update=update_no_sync
+    )
+
+    has_trapdoor: bpy.props.BoolProperty(
+        name="Trampilla a Bodega",
+        description="Genera una perforación en el piso y una tapa para acceder a niveles inferiores",
+        default=False,
+        update=update_no_sync
+    )
+    
+    trapdoor_size: bpy.props.FloatProperty(
+        name="Tamaño (Casillas)",
+        description="Tamaño de la trampilla medido en grilla de combate",
+        default=1.0,
+        min=0.5,
+        update=update_no_sync
+    )
+    
+    trapdoor_y_offset: bpy.props.FloatProperty(
+        name="Desplazamiento Y (Trampilla)",
+        description="Desplaza la trampilla hacia adelante o atrás",
+        default=0.0,
+        update=update_no_sync
     )
 
 classes = [
@@ -192,3 +401,7 @@ def register():
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
+
+
+

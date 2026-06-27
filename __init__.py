@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Procedural Ship Generator",
     "author": "Jarvis",
-    "version": (1, 0, 0),
+    "version": (1, 10, 18),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > Procedural Ship",
     "description": "Generador de barcos D&D modulares, paramétricos y listos para FDM.",
@@ -29,7 +29,8 @@ modules = [
 
 def register():
     for mod in modules:
-        mod.register()
+        if hasattr(mod, 'register'):
+            mod.register()
         
     bpy.types.Object.ship_generator = bpy.props.PointerProperty(type=ship_properties.ShipGeneratorProperties)
 
@@ -37,7 +38,8 @@ def unregister():
     del bpy.types.Object.ship_generator
     
     for mod in reversed(modules):
-        mod.unregister()
+        if hasattr(mod, 'unregister'):
+            mod.unregister()
 
 if __name__ == "__main__":
     register()
