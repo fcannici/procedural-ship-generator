@@ -785,18 +785,14 @@ def rebuild_ship_mesh(obj):
             trim_e = 0.0
             
             if props.section_type == 'BOW':
-                dx = x_fl - x_bl
-                dy = y_fl - (-l2)
-                if abs(dy) > 0.1:
-                    tan_theta = abs(dx / dy)
-                    if tan_theta > 0.01:
-                        stick_out = (rt / 2.0) / tan_theta
-                        trim_e = stick_out + (rt / 2.0) - (rt / 2.0) # -rt/2 to sink into the post
-                
                 # Add a capping post at the tip
                 ret = bmesh.ops.create_cube(bm_final, size=1.0)
                 bmesh.ops.scale(bm_final, vec=(rt, rt, rh), verts=ret['verts'])
                 bmesh.ops.translate(bm_final, vec=(0, l2, h + rh/2.0), verts=ret['verts'])
+                
+                # Trim the side railings so their handrails end exactly inside the post
+                # The handrail extends rt/2 past the end point, so we trim by rt/2
+                trim_e = rt / 2.0
             
             add_railing_line(bm_final, x_bl, -l2, x_fl, y_fl, h, trim_start=trim_s, trim_end=trim_e)
             add_railing_line(bm_final, x_br, -l2, x_fr, y_fr, h, trim_start=trim_s, trim_end=trim_e)
