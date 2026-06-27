@@ -761,24 +761,29 @@ def rebuild_ship_mesh(obj):
                     bmesh.ops.transform(bm, matrix=rot, verts=ret['verts'])
                     bmesh.ops.translate(bm, vec=(px, py, z + rh/2.0), verts=ret['verts'])
     
-            # Center the railing exactly on the top wall edge
-            x_bl = -top_w2 * sc_back - 0.15
-            x_fl = -top_w2 * sc_front - 0.15
-            x_br = top_w2 * sc_back + 0.15
-            x_fr = top_w2 * sc_front + 0.15
+            off_in = getattr(props, 'railing_offset_inward', 0.5)
+            # Apply offset inward relative to the outer edge
+            x_bl = -top_w2 * sc_back + off_in
+            x_fl = -top_w2 * sc_front + off_in
+            x_br = top_w2 * sc_back - off_in
+            x_fr = top_w2 * sc_front - off_in
             
             y_fl = l2
             y_fr = l2
             
-            if x_fl > 0 and x_bl < 0:
-                t = (0 - x_bl) / (x_fl - x_bl)
-                y_fl = -l2 + t * (2 * l2)
+            if props.section_type == 'BOW':
                 x_fl = 0.0
-                
-            if x_fr < 0 and x_br > 0:
-                t = (0 - x_br) / (x_fr - x_br)
-                y_fr = -l2 + t * (2 * l2)
                 x_fr = 0.0
+            else:
+                if x_fl > 0 and x_bl < 0:
+                    t = (0 - x_bl) / (x_fl - x_bl)
+                    y_fl = -l2 + t * (2 * l2)
+                    x_fl = 0.0
+                    
+                if x_fr < 0 and x_br > 0:
+                    t = (0 - x_br) / (x_fr - x_br)
+                    y_fr = -l2 + t * (2 * l2)
+                    x_fr = 0.0
             
             # Center the back railing on the back wall (thickness = 1.2, center = 0.6)
             trim_s = 0.6 if props.section_type == 'STERN' else 0.0
