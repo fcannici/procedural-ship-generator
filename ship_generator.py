@@ -283,8 +283,8 @@ def rebuild_ship_mesh(obj):
         def add_solid_plug(y_back, y_front, min_z=None, max_z=None):
             p_prog_b = (y_back - (-l2)) / (2 * l2) if l2 > 0 else 0
             p_prog_f = (y_front - (-l2)) / (2 * l2) if l2 > 0 else 0
-            s_b = scale_front + (scale_back - scale_front) * p_prog_b
-            s_f = scale_front + (scale_back - scale_front) * p_prog_f
+            s_b = scale_back + (scale_front - scale_back) * p_prog_b
+            s_f = scale_back + (scale_front - scale_back) * p_prog_f
             
             def get_clamped_coord(c):
                 z = c[1]
@@ -338,21 +338,21 @@ def rebuild_ship_mesh(obj):
                 bm.faces.new((pb_verts[i], pb_verts[(i+1)%len(filtered_coords)], pf_verts[(i+1)%len(filtered_coords)], pf_verts[i]))
         
         if props.section_type == 'STERN':
-            add_solid_plug(-l2, -l2 + props.wall_thickness) # Transom plug (REAR, always closed)
+            add_solid_plug(l2 - props.wall_thickness, l2) # Transom plug (REAR, always closed)
             if props.has_quarterdeck:
                 # Archway / upper wall (parte B)
                 if getattr(props, 'quarterdeck_closed_front', False):
-                    add_solid_plug(l2 - props.wall_thickness, l2, min_z=base_h)
-                else:
-                    add_solid_plug(l2 - props.wall_thickness, l2, min_z=h - 10.0)
-        elif props.section_type == 'BOW':
-            add_solid_plug(l2 - props.wall_thickness, l2) # Tip plug (FRONT, always closed)
-            if props.has_forecastle:
-                # Archway / upper wall (parte B)
-                if getattr(props, 'forecastle_closed_back', False):
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=base_h)
                 else:
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=h - 10.0)
+        elif props.section_type == 'BOW':
+            add_solid_plug(-l2, -l2 + props.wall_thickness) # Tip plug (FRONT, always closed)
+            if props.has_forecastle:
+                # Archway / upper wall (parte B)
+                if getattr(props, 'forecastle_closed_back', False):
+                    add_solid_plug(l2 - props.wall_thickness, l2, min_z=base_h)
+                else:
+                    add_solid_plug(l2 - props.wall_thickness, l2, min_z=h - 10.0)
                 
         num_verts = len(verts_coords)
         for s in range(num_segments):
@@ -922,8 +922,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
         mod = obj.modifiers.new("PlankCuts", 'BOOLEAN')
     mod.operation = 'DIFFERENCE'
     mod.object = cutter_obj
-    mod.solver = 'EXACT'
-    if hasattr(mod, 'use_hole_tolerant'): mod.use_hole_tolerant = True
+    mod.solver = 'FAST'
 
         
 
