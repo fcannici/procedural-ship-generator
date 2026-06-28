@@ -1038,8 +1038,9 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
                     
 
                 x_val += lap_depth / 2.0 * sc
-
-                    
+                
+                if x_val < 3.0:
+                    continue  
 
                 ret = bmesh.ops.create_cube(bm, size=1.0)
 
@@ -1252,7 +1253,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             y_front = l2 + 0.1
         elif props.section_type == 'BOW':
             y_back = -l2 - 0.1
-            y_front = l2 + 0.1
+            y_front = 0.0
         elif props.section_type == 'STERN':
             y_back = -l2 - 0.1
             y_front = l2 + 0.1
