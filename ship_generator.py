@@ -915,6 +915,8 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
         cutter_obj.hide_render = True
         cutter_obj.display_type = 'WIRE'
         
+    cutter_obj.matrix_world = obj.matrix_world.copy()
+        
     mod = obj.modifiers.get("PlankCuts")
     if not mod:
         mod = obj.modifiers.new("PlankCuts", 'BOOLEAN')
@@ -1107,6 +1109,10 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             if abs(x_line) < max_w2 - 1.0:
                 y_start_line = -l2
                 y_end_line = l2
+                if props.section_type == 'STERN':
+                    y_start_line = -l2 + t
+                elif props.section_type == 'BOW':
+                    y_end_line = l2 - t
                 if abs(x_line) > min_w2 and scale_front != scale_back:
                     y_cross = (abs(x_line) / inner_floor_x - scale_back) / (scale_front - scale_back) * (2 * l2) - l2
                     if scale_front > scale_back: # STERN
@@ -1123,10 +1129,15 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             
             # Horizontal staggered cuts along X
             y_start = -l2
+            if props.section_type == 'STERN':
+                y_start = -l2 + t
             while y_start < l2:
                 board_len = fp_l * random.uniform(0.6, 1.4)
                 y_cut = y_start + board_len
                 
+                if props.section_type == 'BOW' and y_cut > l2 - t:
+                    break
+                    
                 if y_cut < l2 - 2.0:
                     p_y = (y_cut - (-l2)) / (2 * l2) if l2 > 0 else 0
                     s_y = scale_back + (scale_front - scale_back) * p_y
@@ -1256,6 +1267,8 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             bpy.context.collection.objects.link(slot_cutter_obj)
             slot_cutter_obj.hide_viewport = True
             slot_cutter_obj.hide_render = True
+            
+        slot_cutter_obj.matrix_world = obj.matrix_world.copy()
             
         bm_slot = bmesh.new()
             
