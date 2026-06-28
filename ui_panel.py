@@ -53,10 +53,24 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                         box.prop(props, "forecastle_closed_back")
                 box.prop(props, "generate_stairs")
                 if props.generate_stairs:
-                    box.prop(props, "stairs_offset_x")
-                    box.prop(props, "stairs_offset_y")
-                    box.prop(props, "stairs_width")
-                    box.prop(props, "stairs_length")
+                    # If empty, maybe add one? The user can just click add.
+                    row = box.row()
+                    row.operator("object.add_ship_stair", text="Añadir Escalera", icon='ADD')
+                    row.operator("object.remove_ship_stair", text="Eliminar", icon='REMOVE')
+                    
+                    if len(props.stairs) > 0:
+                        box.prop(props, "active_stair_idx", text=f"Escalera ({len(props.stairs)})")
+                        idx = props.active_stair_idx
+                        if 0 <= idx < len(props.stairs):
+                            st = props.stairs[idx]
+                            sbox = box.box()
+                            sbox.prop(st, "level")
+                            sbox.prop(st, "direction")
+                            sbox.prop(st, "offset_x")
+                            sbox.prop(st, "offset_y")
+                            sbox.prop(st, "rotation_z")
+                            sbox.prop(st, "width")
+                            sbox.prop(st, "length")
                     
                 if props.has_quarterdeck or props.has_forecastle:
                     box.prop(props, "deck_elevation")
@@ -139,6 +153,38 @@ class OBJECT_OT_generate_ship_section(bpy.types.Operator):
         
         return {'FINISHED'}
 
+class OBJECT_OT_add_ship_stair(bpy.types.Operator):
+    bl_idname = "object.add_ship_stair"
+    bl_label = "Añadir Escalera"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and hasattr(obj, 'ship_generator'):
+            props = obj.ship_generator
+            props.stairs.add()
+            props.active_stair_idx = len(props.stairs) - 1
+            from .ship_generator import rebuild_ship_mesh
+            rebuild_ship_mesh(obj)
+        return {'FINISHED'}
+
+class OBJECT_OT_remove_ship_stair(bpy.types.Operator):
+    bl_idname = "object.remove_ship_stair"
+    bl_label = "Eliminar Escalera"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and hasattr(obj, 'ship_generator'):
+            props = obj.ship_generator
+            idx = props.active_stair_idx
+            if 0 <= idx < len(props.stairs):
+                props.stairs.remove(idx)
+                props.active_stair_idx = max(0, idx - 1)
+                from .ship_generator import rebuild_ship_mesh
+                rebuild_ship_mesh(obj)
+        return {'FINISHED'}
+
 class OBJECT_OT_generate_full_ship(bpy.types.Operator):
     bl_idname = "object.generate_full_ship"
     bl_label = "Generar Barco Inicial (3 Partes)"
@@ -211,6 +257,8 @@ class OBJECT_OT_generate_connector_clip(bpy.types.Operator):
 classes = [
     VIEW3D_PT_procedural_ship,
     OBJECT_OT_generate_ship_section,
+    OBJECT_OT_add_ship_stair,
+    OBJECT_OT_remove_ship_stair,
     OBJECT_OT_generate_full_ship,
     OBJECT_OT_generate_connector_clip
 ]

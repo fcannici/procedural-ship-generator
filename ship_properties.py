@@ -113,6 +113,60 @@ def update_floor_plank_length(self, context): _sync_prop(self, context, 'floor_p
 
 def update_generate_connector_slot(self, context): _sync_prop(self, context, 'generate_connector_slot')
 
+class StairItem(bpy.types.PropertyGroup):
+    level: bpy.props.EnumProperty(
+        name="Nivel",
+        description="Niveles que conecta la escalera",
+        items=[
+            ('BODEGA_MAIN', "Bodega a Principal", "Conecta la bodega con la cubierta principal"),
+            ('MAIN_CASTLE', "Principal a Castillo", "Conecta la cubierta principal con el castillo (si existe)")
+        ],
+        default='BODEGA_MAIN',
+        update=update_no_sync
+    )
+    direction: bpy.props.EnumProperty(
+        name="Dirección",
+        description="Hacia dónde se extiende la escalera",
+        items=[
+            ('INWARD', "Hacia Adentro", "La escalera se construye hacia el interior del módulo"),
+            ('OUTWARD', "Hacia Afuera", "La escalera sobresale hacia el módulo adyacente")
+        ],
+        default='INWARD',
+        update=update_no_sync
+    )
+    offset_x: bpy.props.FloatProperty(
+        name="Offset X Escalera",
+        description="Mueve las escaleras lateralmente",
+        default=0.0,
+        update=update_no_sync
+    )
+    offset_y: bpy.props.FloatProperty(
+        name="Offset Y Escalera",
+        description="Mueve las escaleras longitudinalmente",
+        default=0.0,
+        update=update_no_sync
+    )
+    rotation_z: bpy.props.FloatProperty(
+        name="Rotación Z Escalera",
+        description="Rota las escaleras sobre el eje Z (en grados)",
+        default=0.0,
+        update=update_no_sync
+    )
+    width: bpy.props.FloatProperty(
+        name="Ancho Escalera",
+        description="Define el ancho de la escalera",
+        default=20.0,
+        min=5.0,
+        update=update_no_sync
+    )
+    length: bpy.props.FloatProperty(
+        name="Largo Escalera",
+        description="Define qué tan lejos llegan los escalones",
+        default=40.0,
+        min=5.0,
+        update=update_no_sync
+    )
+
 class ShipGeneratorProperties(bpy.types.PropertyGroup):
     is_ship: bpy.props.BoolProperty(
         name="Es un barco procedural",
@@ -199,7 +253,7 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
     )
     
     deck_elevation: bpy.props.FloatProperty(
-        name="Elevación (mm)",
+        name="Alto de Pared del Castillo (mm)",
         description="Altura adicional para los castillos",
         default=25.0,
         min=10.0,
@@ -212,31 +266,11 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         default=True,
         update=update_no_sync
     )
-    stairs_offset_x: bpy.props.FloatProperty(
-        name="Offset X Escalera",
-        description="Mueve las escaleras lateralmente",
-        default=0.0,
-        update=update_no_sync
-    )
-    stairs_offset_y: bpy.props.FloatProperty(
-        name="Offset Y Escalera",
-        description="Mueve las escaleras longitudinalmente",
-        default=0.0,
-        update=update_no_sync
-    )
-    stairs_length: bpy.props.FloatProperty(
-        name="Largo Escalera",
-        description="Define qué tan lejos llegan los escalones",
-        default=40.0,
-        min=5.0,
-        update=update_no_sync
-    )
-    stairs_width: bpy.props.FloatProperty(
-        name="Ancho Escalera",
-        description="Define el ancho de la escalera",
-        default=20.0,
-        min=5.0,
-        update=update_no_sync
+    
+    stairs: bpy.props.CollectionProperty(type=StairItem)
+    active_stair_idx: bpy.props.IntProperty(
+        name="Escalera Activa",
+        default=0
     )
     
     floor_thickness: bpy.props.FloatProperty(
@@ -435,6 +469,7 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
     )
 
 classes = [
+    StairItem,
     ShipGeneratorProperties
 ]
 

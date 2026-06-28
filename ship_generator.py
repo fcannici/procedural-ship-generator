@@ -580,7 +580,7 @@ def rebuild_ship_mesh(obj):
     
     needs_deck_cuts = False
     if props.generate_top_deck:
-        if getattr(props, 'generate_stairs', False) and props.section_type in ['STERN', 'BOW']:
+        if getattr(props, 'generate_stairs', False):
             needs_deck_cuts = True
         if getattr(props, 'has_trapdoor', False) or getattr(props, 'has_mast', False):
             needs_deck_cuts = True
@@ -598,32 +598,42 @@ def rebuild_ship_mesh(obj):
         
         bm_deck_cutter = bmesh.new()
         
-        if getattr(props, 'generate_stairs', False) and props.section_type in ['STERN', 'BOW']:
+        if getattr(props, 'generate_stairs', False):
             y_start = l2 if props.section_type == 'STERN' else -l2
-            s_width = getattr(props, 'stairs_width', 20.0)
-            s_length = getattr(props, 'stairs_length', 40.0)
-            off_x = getattr(props, 'stairs_offset_x', 0.0)
-            off_y = getattr(props, 'stairs_offset_y', 0.0)
             y_dir = -1.0 if props.section_type == 'STERN' else 1.0
-            
-            hole_len = s_length + 2.0
-            hole_w = s_width + 2.0
-            hole_h = 6.0 
-            
-            cy = y_start + (off_y * y_dir) + (s_length / 2.0 * y_dir)
-            cx = off_x
-            cz = h - 1.0
-            
-            ret = bmesh.ops.create_cube(bm_deck_cutter, size=1.0)
-            bmesh.ops.scale(bm_deck_cutter, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])
-            bmesh.ops.translate(bm_deck_cutter, vec=(cx, cy, cz), verts=ret['verts'])
-            
-            has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
-            if has_castle:
-                cz_lower = base_h - 1.0
-                ret_lower = bmesh.ops.create_cube(bm_deck_cutter, size=1.0)
-                bmesh.ops.scale(bm_deck_cutter, vec=(hole_w, hole_len, hole_h), verts=ret_lower['verts'])
-                bmesh.ops.translate(bm_deck_cutter, vec=(cx, cy, cz_lower), verts=ret_lower['verts'])
+            for stair in props.stairs:
+                level = getattr(stair, 'level', 'BODEGA_MAIN')
+                direction = getattr(stair, 'direction', 'INWARD')
+                
+                s_width = getattr(stair, 'width', 20.0)
+                s_length = getattr(stair, 'length', 40.0)
+                off_x = getattr(stair, 'offset_x', 0.0)
+                off_y = getattr(stair, 'offset_y', 0.0)
+                rot_z = getattr(stair, 'rotation_z', 0.0)
+                
+                y_dir_stair = y_dir * (-1.0 if direction == 'OUTWARD' else 1.0)
+                
+                hole_len = s_length + 2.0
+                hole_w = s_width + 2.0
+                hole_h = 6.0 
+                
+                cy = y_start + (off_y * y_dir) + (s_length / 2.0 * y_dir_stair)
+                cx = off_x
+                
+                has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+                if level == 'BODEGA_MAIN':
+                    cz = base_h - 1.0
+                else:
+                    if not has_castle:
+                        continue
+                    cz = h - 1.0
+                
+                ret = bmesh.ops.create_cube(bm_deck_cutter, size=1.0)
+                bmesh.ops.scale(bm_deck_cutter, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])
+                if rot_z != 0.0:
+                    rot_mat = mathutils.Matrix.Rotation(math.radians(rot_z), 4, 'Z')
+                    bmesh.ops.transform(bm_deck_cutter, matrix=rot_mat, verts=ret['verts'])
+                bmesh.ops.translate(bm_deck_cutter, vec=(cx, cy, cz), verts=ret['verts'])
                 
         if getattr(props, 'has_trapdoor', False):
             td_size = getattr(props, 'trapdoor_size', 1.0) * 25.4
@@ -681,51 +691,75 @@ def rebuild_ship_mesh(obj):
             mast_td_z = h - 2.0
             
         if getattr(props, 'generate_stairs', False):
-            if props.section_type in ['STERN', 'BOW']:
-                y_start = l2 if props.section_type == 'STERN' else -l2
+            y_start = l2 if props.section_type == 'STERN' else -l2
+            y_dir = -1.0 if props.section_type == 'STERN' else 1.0
+            
+            for stair in props.stairs:
+                level = getattr(stair, 'level', 'BODEGA_MAIN')
+                direction = getattr(stair, 'direction', 'INWARD')
                 
-                s_width = getattr(props, 'stairs_width', 20.0)
+                s_width = getattr(stair, 'width', 20.0)
                 stair_w2 = s_width / 2.0
                 
-                s_length = getattr(props, 'stairs_length', 40.0)
+                s_length = getattr(stair, 'length', 40.0)
                 
-                off_x = getattr(props, 'stairs_offset_x', 0.0)
-                off_y = getattr(props, 'stairs_offset_y', 0.0)
+                off_x = getattr(stair, 'offset_x', 0.0)
+                off_y = getattr(stair, 'offset_y', 0.0)
+                rot_z = getattr(stair, 'rotation_z', 0.0)
                 
                 step_height = 5.0
                 
-                # Stairs from Bodega (ft) to Main Deck (h)
-                # Note: We go up to 'h' so it reaches the top surface of the deck without a gap.
-                target_z = h
-                elev_lower = target_z - ft
+                y_dir_stair = y_dir * (-1.0 if direction == 'OUTWARD' else 1.0)
+                
+                cx = off_x
+                cy = y_start + (off_y * y_dir) + (s_length / 2.0 * y_dir_stair)
+                rot_mat = None
+                if rot_z != 0.0:
+                    rot_mat = mathutils.Matrix.Rotation(math.radians(rot_z), 4, 'Z')
+                
+                def xform(lx, ly, lz, cx_val=cx, cy_val=cy, rm_val=rot_mat):
+                    vec = mathutils.Vector((lx, ly, lz))
+                    if rm_val:
+                        vec = rm_val @ vec
+                    return (vec.x + cx_val, vec.y + cy_val, vec.z)
+                
+                has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+                if level == 'BODEGA_MAIN':
+                    z_start = ft
+                    target_z = base_h
+                else:
+                    if not has_castle:
+                        continue
+                    z_start = base_h
+                    target_z = h
+                
+                elev_lower = target_z - z_start
                 if elev_lower > 0:
                     num_steps = int(math.ceil(elev_lower / step_height))
                     step_depth = s_length / float(num_steps)
                     
-                    y_dir = -1.0 if props.section_type == 'STERN' else 1.0
-                    
                     for i in range(num_steps):
-                        z0 = ft + i * step_height
-                        z1 = ft + (i + 1) * step_height
+                        z0 = z_start + i * step_height
+                        z1 = z_start + (i + 1) * step_height
                         if i == num_steps - 1:
                             z1 = target_z # Ensure exact match on last step
                         
                         dist = num_steps - 1 - i
-                        y0 = y_start + dist * step_depth * y_dir + (off_y * y_dir)
-                        y1 = y_start + (dist + 1) * step_depth * y_dir + (off_y * y_dir)
+                        y0_loc = dist * step_depth * y_dir_stair - (s_length / 2.0 * y_dir_stair)
+                        y1_loc = (dist + 1) * step_depth * y_dir_stair - (s_length / 2.0 * y_dir_stair)
                         
-                        x0 = -stair_w2 + off_x
-                        x1 = stair_w2 + off_x
+                        x0_loc = -stair_w2
+                        x1_loc = stair_w2
                         
                         sv = [
-                            bm_final.verts.new((x0, y0, z0)),
-                            bm_final.verts.new((x1, y0, z0)),
-                            bm_final.verts.new((x1, y0, z1)),
-                            bm_final.verts.new((x0, y0, z1)),
-                            bm_final.verts.new((x0, y1, z0)),
-                            bm_final.verts.new((x1, y1, z0)),
-                            bm_final.verts.new((x1, y1, z1)),
-                            bm_final.verts.new((x0, y1, z1))
+                            bm_final.verts.new(xform(x0_loc, y0_loc, z0)),
+                            bm_final.verts.new(xform(x1_loc, y0_loc, z0)),
+                            bm_final.verts.new(xform(x1_loc, y0_loc, z1)),
+                            bm_final.verts.new(xform(x0_loc, y0_loc, z1)),
+                            bm_final.verts.new(xform(x0_loc, y1_loc, z0)),
+                            bm_final.verts.new(xform(x1_loc, y1_loc, z0)),
+                            bm_final.verts.new(xform(x1_loc, y1_loc, z1)),
+                            bm_final.verts.new(xform(x0_loc, y1_loc, z1))
                         ]
                         
                         bm_final.faces.new((sv[0], sv[3], sv[2], sv[1]))
@@ -1192,27 +1226,35 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             needs_hull_stair_cut = True
             
         if needs_hull_stair_cut:
-            s_width = getattr(props, 'stairs_width', 20.0)
-            off_x = getattr(props, 'stairs_offset_x', 0.0)
-            
-            # The hull's stair hole ONLY needs to cut the front wall plug (which is `props.wall_thickness` thick)
-            # A full-length cutter floating in the hollow hull causes EXACT solver non-manifold errors.
             t_wall = props.wall_thickness
-            hole_len = t_wall + 2.0
-            hole_w = s_width + 2.0
-            hole_h = h - deck_z + 4.0
-            
-            if props.section_type == 'STERN':
-                cy = l2 - t_wall / 2.0
-            else:
-                cy = -l2 + t_wall / 2.0
+            for stair in props.stairs:
+                off_y = getattr(stair, 'offset_y', 0.0)
+                # Only cut the wall if the stair actually touches/intersects the wall
+                if abs(off_y) >= t_wall:
+                    continue
                 
-            cx = off_x
-            cz = deck_z + (h - deck_z) / 2.0
-            
-            ret = bmesh.ops.create_cube(bm, size=1.0)
-            bmesh.ops.scale(bm, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])
-            bmesh.ops.translate(bm, vec=(cx, cy, cz), verts=ret['verts'])
+                s_width = getattr(stair, 'width', 20.0)
+                off_x = getattr(stair, 'offset_x', 0.0)
+                rot_z = getattr(stair, 'rotation_z', 0.0)
+                
+                hole_len = t_wall + 2.0
+                hole_w = s_width + 2.0
+                hole_h = h - deck_z + 4.0
+                
+                if props.section_type == 'STERN':
+                    cy = l2 - t_wall / 2.0
+                else:
+                    cy = -l2 + t_wall / 2.0
+                    
+                cx = off_x
+                cz = deck_z + (h - deck_z) / 2.0
+                
+                ret = bmesh.ops.create_cube(bm, size=1.0)
+                bmesh.ops.scale(bm, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])
+                if rot_z != 0.0:
+                    rot_mat = mathutils.Matrix.Rotation(math.radians(rot_z), 4, 'Z')
+                    bmesh.ops.transform(bm, matrix=rot_mat, verts=ret['verts'])
+                bmesh.ops.translate(bm, vec=(cx, cy, cz), verts=ret['verts'])
 
 
 
