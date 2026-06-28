@@ -1275,7 +1275,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             mod = obj.modifiers.new("SlotCuts", 'BOOLEAN')
         mod.operation = 'DIFFERENCE'
         mod.object = slot_cutter_obj
-        mod.solver = 'EXACT'
+        mod.solver = 'FAST'
 
     add_continuous_slot_cutter()
         
