@@ -283,8 +283,8 @@ def rebuild_ship_mesh(obj):
         def add_solid_plug(y_back, y_front, min_z=None, max_z=None):
             p_prog_b = (y_back - (-l2)) / (2 * l2) if l2 > 0 else 0
             p_prog_f = (y_front - (-l2)) / (2 * l2) if l2 > 0 else 0
-            s_b = scale_back + (scale_front - scale_back) * p_prog_b
-            s_f = scale_back + (scale_front - scale_back) * p_prog_f
+            s_b = scale_front + (scale_back - scale_front) * p_prog_b
+            s_f = scale_front + (scale_back - scale_front) * p_prog_f
             
             def get_clamped_coord(c):
                 z = c[1]
