@@ -51,7 +51,14 @@ def update_no_sync(self, context):
     from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
     if obj and obj.type == 'MESH':
-        rebuild_ship_mesh(obj)
+        try:
+            rebuild_ship_mesh(obj)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            def draw(self, context):
+                self.layout.label(text=f"Error al generar: {str(e)}")
+            context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
     _realign_ship(context)
 
 def _sync_prop(self, context, prop_name):
@@ -66,12 +73,26 @@ def _sync_prop(self, context, prop_name):
             for other in list(context.view_layer.objects):
                 if other and other != obj and other.type == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
                     setattr(other.ship_generator, prop_name, val)
-                    rebuild_ship_mesh(other)
+                    try:
+                        rebuild_ship_mesh(other)
+                    except Exception as e:
+                        import traceback
+                        traceback.print_exc()
+                        def draw(self, context):
+                            self.layout.label(text=f"Error (Sincronizado): {str(e)}")
+                        context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
         finally:
             _updating_all = False
             
     if obj and obj.type == 'MESH':
-        rebuild_ship_mesh(obj)
+        try:
+            rebuild_ship_mesh(obj)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            def draw(self, context):
+                self.layout.label(text=f"Error al generar: {str(e)}")
+            context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
     _realign_ship(context)
 
 def update_tiles_width(self, context): _sync_prop(self, context, 'tiles_width')
@@ -89,6 +110,8 @@ def update_plank_cut_density(self, context): _sync_prop(self, context, 'plank_cu
 def update_generate_floor_planks(self, context): _sync_prop(self, context, 'generate_floor_planks')
 def update_floor_plank_width(self, context): _sync_prop(self, context, 'floor_plank_width')
 def update_floor_plank_length(self, context): _sync_prop(self, context, 'floor_plank_length')
+
+def update_generate_connector_slot(self, context): _sync_prop(self, context, 'generate_connector_slot')
 
 class ShipGeneratorProperties(bpy.types.PropertyGroup):
     is_ship: bpy.props.BoolProperty(
@@ -154,9 +177,23 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
+    quarterdeck_closed_front: bpy.props.BoolProperty(
+        name="Cerrar Castillo de Popa",
+        description="Cierra toda la pared frontal del castillo. Si está desactivado, deja un balcón abierto a la cubierta inferior.",
+        default=False,
+        update=update_no_sync
+    )
+    
     has_forecastle: bpy.props.BoolProperty(
         name="Castillo de Proa",
         description="Eleva la cubierta delantera",
+        default=False,
+        update=update_no_sync
+    )
+    
+    forecastle_closed_back: bpy.props.BoolProperty(
+        name="Cerrar Castillo de Proa",
+        description="Cierra toda la pared trasera del castillo. Si está desactivado, deja un balcón abierto a la cubierta inferior.",
         default=False,
         update=update_no_sync
     )
@@ -279,6 +316,13 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         description="Genera textura de tablones separados en la cubierta",
         default=True,
         update=update_generate_floor_planks
+    )
+    
+    generate_connector_slot: bpy.props.BoolProperty(
+        name="Generar Canaleta (Zocalo)",
+        description="Genera la canaleta inferior para conectar las piezas",
+        default=True,
+        update=update_generate_connector_slot
     )
     
     floor_plank_width: bpy.props.FloatProperty(

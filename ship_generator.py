@@ -1233,6 +1233,9 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
         (2.742, -0.5, 0)
     ]
     def add_continuous_slot_cutter():
+        if not props.generate_connector_slot:
+            return
+            
         if props.section_type == 'MID':
             y_back = -l2 - 0.1
             y_front = l2 + 0.1

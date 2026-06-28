@@ -36,13 +36,21 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                 if props.generate_floor_planks:
                     box.prop(props, "floor_plank_width")
                     box.prop(props, "floor_plank_length")
+                    
+                box = layout.box()
+                box.label(text="Conectores Inferiores", icon='LINKED')
+                box.prop(props, "generate_connector_slot")
                 
                 box = layout.box()
                 box.label(text="Arquitectura Multinivel", icon='GROUP_VERTEX')
                 if props.section_type == 'STERN':
                     box.prop(props, "has_quarterdeck")
+                    if props.has_quarterdeck:
+                        box.prop(props, "quarterdeck_closed_front")
                 elif props.section_type == 'BOW':
                     box.prop(props, "has_forecastle")
+                    if props.has_forecastle:
+                        box.prop(props, "forecastle_closed_back")
                 box.prop(props, "generate_stairs")
                 if props.generate_stairs:
                     box.prop(props, "stairs_offset_x")
