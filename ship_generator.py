@@ -1227,10 +1227,10 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     # 4. Connector Slots
     peg_l2 = 10.0
     slot_verts = [
-        (-3.0, -0.1, 0),
-        (-5.0, 3.0, 0),
-        (5.0, 3.0, 0),
-        (3.0, -0.1, 0)
+        (-2.742, -0.5, 0),
+        (-5.322, 3.5, 0),
+        (5.322, 3.5, 0),
+        (2.742, -0.5, 0)
     ]
     def add_continuous_slot_cutter():
         if props.section_type == 'MID':
@@ -1238,9 +1238,9 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             y_front = l2 + 0.1
         elif props.section_type == 'BOW':
             y_back = -l2 - 0.1
-            y_front = (l2 * 0.5) + 0.01 # Add tiny epsilon to avoid coplanar grid line
+            y_front = l2 + 0.1
         elif props.section_type == 'STERN':
-            y_back = (-l2 * 0.5) - 0.01
+            y_back = -l2 - 0.1
             y_front = l2 + 0.1
         else:
             return
