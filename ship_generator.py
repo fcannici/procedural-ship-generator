@@ -8,7 +8,63 @@ def create_grid(bm, x_min, x_max, y_min, y_max, z, grid_size=25.4, depth=0.5, wi
     # This function will sculpt the 1x1 grid lines on the floor
     pass
 
+
+def create_deck_planks(bm_deck, start_y, end_y, w2, z, thickness, scale_front, scale_back, section_type, l2):
+    deck_y_segments = max(1, int((end_y - start_y) / 25.4))
+    seg_len = (end_y - start_y) / deck_y_segments
+    num_deck_planks = 4
+    plank_gap = 0.5
+    pw = (w2 * 2) / num_deck_planks
+    for iy in range(deck_y_segments):
+        sy1 = start_y + iy * seg_len + 0.2
+        sy2 = start_y + (iy + 1) * seg_len - 0.2
+        planks = []
+        if iy % 2 == 0:
+            for p in range(num_deck_planks):
+                px1 = -w2 + p * pw
+                px2 = -w2 + (p + 1) * pw - plank_gap
+                planks.append((px1, px2))
+        else:
+            px1 = -w2
+            px2 = -w2 + pw / 2 - plank_gap
+            planks.append((px1, px2))
+            for p in range(num_deck_planks - 1):
+                px1 = -w2 + pw / 2 + p * pw
+                px2 = -w2 + pw / 2 + (p + 1) * pw - plank_gap
+                planks.append((px1, px2))
+            px1 = -w2 + pw / 2 + (num_deck_planks - 1) * pw
+            px2 = w2 - plank_gap
+            planks.append((px1, px2))
+        for px1, px2 in planks:
+            if px2 <= px1: continue
+            d_verts = [
+                (px1, z, 0),
+                (px2, z, 0),
+                (px2, z + thickness, 0),
+                (px1, z + thickness, 0)
+            ]
+            if section_type == 'STERN':
+                p_sy1 = (sy1 - (-l2)) / (2*l2) if l2 > 0 else 0
+                p_sy2 = (sy2 - (-l2)) / (2*l2) if l2 > 0 else 0
+                sc1 = scale_back + (scale_front - scale_back) * p_sy1
+                sc2 = scale_back + (scale_front - scale_back) * p_sy2
+            elif section_type == 'BOW':
+                p_sy1 = (sy1 - (-l2)) / (2*l2) if l2 > 0 else 0
+                p_sy2 = (sy2 - (-l2)) / (2*l2) if l2 > 0 else 0
+                sc1 = scale_back + (scale_front - scale_back) * p_sy1
+                sc2 = scale_back + (scale_front - scale_back) * p_sy2
+            else:
+                sc1 = 1.0
+                sc2 = 1.0
+            d_back = [bm_deck.verts.new((c[0] * sc1, sy1, c[1])) for c in d_verts]
+            d_front = [bm_deck.verts.new((c[0] * sc2, sy2, c[1])) for c in d_verts]
+            bm_deck.faces.new((d_back[0], d_back[3], d_back[2], d_back[1]))
+            bm_deck.faces.new((d_front[0], d_front[1], d_front[2], d_front[3]))
+            for i in range(4):
+                bm_deck.faces.new((d_back[i], d_back[(i+1)%4], d_front[(i+1)%4], d_front[i]))
+
 def build_hull(bm, props):
+
     """
     Builds the main hull base
     """
@@ -40,11 +96,11 @@ def rebuild_ship_mesh(obj):
         p_back = [bm.verts.new((c[0], -peg_l2, c[1])) for c in p_verts]
         p_front = [bm.verts.new((c[0], peg_l2, c[1])) for c in p_verts]
         
-        bm.faces.new((p_back[0], p_back[3], p_back[2], p_back[1])) # CW
-        bm.faces.new((p_front[0], p_front[1], p_front[2], p_front[3])) # CCW
+        bm.faces.new((p_back[0], p_back[3], p_back[2], p_back[1])) # Outwards (-Y)
+        bm.faces.new((p_front[0], p_front[1], p_front[2], p_front[3])) # Outwards (+Y)
         
         for i in range(4):
-            bm.faces.new((p_back[i], p_front[i], p_front[(i+1)%4], p_back[(i+1)%4]))
+            bm.faces.new((p_back[i], p_back[(i+1)%4], p_front[(i+1)%4], p_front[i]))
             
         bm.normal_update()
         bm.to_mesh(obj.data)
@@ -60,10 +116,8 @@ def rebuild_ship_mesh(obj):
     
     if props.section_type == 'STERN' and props.has_quarterdeck:
         h += props.deck_elevation
-        ft += props.deck_elevation
     elif props.section_type == 'BOW' and props.has_forecastle:
         h += props.deck_elevation
-        ft += props.deck_elevation
     
     bot_w2 = (props.tiles_width * grid_size) / 2.0 + t
     w2 = bot_w2 * 2.0
@@ -74,53 +128,43 @@ def rebuild_ship_mesh(obj):
     
     # Calculate top widths to maintain perfectly collinear slopes with the base hull
     dz = base_h - mid_h
-    if dz > 0:
-        dx = w2 - mid_w2
-        top_w2 = mid_w2 + (h - mid_h) * (dx / dz)
-    else:
-        top_w2 = w2
-
+    top_w2 = w2
+    
     plank_h = props.plank_height
     lapstrake_depth = props.lapstrake_depth
     
-    def generate_outer_profile(bw, mw, tw, bz, mz, tz):
+    def generate_outer_profile(checkpoints):
         pts = []
-        
-        # Bottom section: from bz to mz
-        z_current = bz
-        while z_current < mz - 0.001:
-            z_next = min(z_current + plank_h, mz)
+        for i in range(len(checkpoints) - 1):
+            w0, z0 = checkpoints[i]
+            w1, z1 = checkpoints[i+1]
             
-            p0 = (z_current - bz) / (mz - bz) if mz > bz else 0
-            p1 = (z_next - bz) / (mz - bz) if mz > bz else 0
+            if z1 <= z0: continue
             
-            x0 = bw + (mw - bw) * p0
-            x1 = bw + (mw - bw) * p1
-            
-            pts.append((x0, z_current))
-            pts.append((x1 + lapstrake_depth, z_next))
-            
-            z_current = z_next
-
-        # Top section: from mz to tz
-        z_current = mz
-        while z_current < tz - 0.001:
-            z_next = min(z_current + plank_h, tz)
-            
-            p0 = (z_current - mz) / (tz - mz) if tz > mz else 0
-            p1 = (z_next - mz) / (tz - mz) if tz > mz else 0
-            
-            x0 = mw + (tw - mw) * p0
-            x1 = mw + (tw - mw) * p1
-            
-            pts.append((x0, z_current))
-            pts.append((x1 + lapstrake_depth, z_next))
-            
-            z_current = z_next
-            
+            z_current = z0
+            while z_current < z1 - 0.001:
+                z_next = min(z_current + plank_h, z1)
+                
+                p0 = (z_current - z0) / (z1 - z0)
+                p1 = (z_next - z0) / (z1 - z0)
+                
+                x0 = w0 + (w1 - w0) * p0
+                x1 = w0 + (w1 - w0) * p1
+                
+                pts.append((x0, z_current))
+                pts.append((x1 + lapstrake_depth, z_next))
+                
+                z_current = z_next
         return pts
-
-    outer_right_profile = generate_outer_profile(bot_w2, mid_w2, top_w2, 0, mid_h, h)
+        
+    profile_checkpoints = [(bot_w2, 0), (mid_w2, mid_h)]
+    if h > base_h:
+        profile_checkpoints.append((w2, base_h))
+        profile_checkpoints.append((w2, h))
+    else:
+        profile_checkpoints.append((w2, base_h))
+        
+    outer_right_profile = generate_outer_profile(profile_checkpoints)
     
     outer_left = [(-p[0], p[1], 0) for p in reversed(outer_right_profile)]
     
@@ -131,44 +175,23 @@ def rebuild_ship_mesh(obj):
     
     outer_right = [(p[0], p[1], 0) for p in outer_right_profile]
     
-    # Calculate intersection of the floor with the inner hull
-    if ft >= mid_h:
-        dz_upper = h - mid_h
-        dx_upper = top_w2 - mid_w2
-        if dz_upper > 0:
-            inner_floor_x = (mid_w2 - t) + (ft - mid_h) * (dx_upper / dz_upper)
+    def get_inner_x_at_z(z):
+        if z >= base_h:
+            return w2 - t
+        elif z >= mid_h:
+            d_z = base_h - mid_h
+            return (mid_w2 - t) + (z - mid_h) * ((w2 - mid_w2) / d_z) if d_z > 0 else (w2 - t)
         else:
-            inner_floor_x = top_w2 - t
-    else:
-        dz_lower = mid_h
-        dx_lower = mid_w2 - bot_w2
-        if dz_lower > 0:
-            inner_floor_x = (bot_w2 - t) + ft * (dx_lower / dz_lower)
-        else:
-            inner_floor_x = bot_w2 - t
+            d_z = mid_h
+            return (bot_w2 - t) + z * ((mid_w2 - bot_w2) / d_z) if d_z > 0 else (bot_w2 - t)
             
+    inner_floor_x = get_inner_x_at_z(ft)
+    
     inner_right = []
     for p in reversed(outer_right_profile):
         z = p[1]
-        if z <= ft:
-            continue
-            
-        if z >= mid_h:
-            dz_upper = h - mid_h
-            dx_upper = top_w2 - mid_w2
-            if dz_upper > 0:
-                ix = (mid_w2 - t) + (z - mid_h) * (dx_upper / dz_upper)
-            else:
-                ix = top_w2 - t
-        else:
-            dz_lower = mid_h
-            dx_lower = mid_w2 - bot_w2
-            if dz_lower > 0:
-                ix = (bot_w2 - t) + z * (dx_lower / dz_lower)
-            else:
-                ix = bot_w2 - t
-                
-        inner_right.append((ix, z, 0))
+        if z <= ft: continue
+        inner_right.append((get_inner_x_at_z(z), z, 0))
         
     inner_right.append((inner_floor_x, ft, 0))
     inner_left = [(-p[0], p[1], 0) for p in reversed(inner_right)]
@@ -257,25 +280,51 @@ def rebuild_ship_mesh(obj):
         # === Solid Plugs to Close the Ship's Interior ===
         plug_coords = [verts_coords[i] for i in range(idx_inner_right, len(verts_coords))]
         
-        def add_solid_plug(y_back, y_front):
+        def add_solid_plug(y_back, y_front, min_z=None, max_z=None):
             p_prog_b = (y_back - (-l2)) / (2 * l2) if l2 > 0 else 0
             p_prog_f = (y_front - (-l2)) / (2 * l2) if l2 > 0 else 0
             s_b = scale_back + (scale_front - scale_back) * p_prog_b
             s_f = scale_back + (scale_front - scale_back) * p_prog_f
             
-            pb_verts = []
-            for c in plug_coords:
-                x = c[0] * s_b
+            def get_clamped_coord(c):
                 z = c[1]
+                
+                # Apply max_z if needed
+                if max_z is not None and z > max_z:
+                    ix = get_inner_x_at_z(max_z)
+                    if c[0] < 0:
+                        ix = -ix
+                    return (ix, max_z, 0)
+                
+                # Apply min_z if needed
+                if min_z is None or z >= min_z:
+                    return c
+                
+                # Interpolate X at min_z (inner wall)
+                ix = get_inner_x_at_z(min_z)
+                if c[0] < 0:
+                    ix = -ix
+                return (ix, min_z, 0)
+                
+            filtered_coords = []
+            for c in plug_coords:
+                cc = get_clamped_coord(c)
+                if not filtered_coords or cc != filtered_coords[-1]:
+                    filtered_coords.append(cc)
+            
+            pb_verts = []
+            for cc in filtered_coords:
+                x = cc[0] * s_b
+                z = cc[1]
                 if x > 0.1: x += 0.1
                 elif x < -0.1: x -= 0.1
                 if z < props.floor_thickness + 0.1: z -= 0.1
                 pb_verts.append(bm.verts.new((x, y_back, z)))
             
             pf_verts = []
-            for c in plug_coords:
-                x = c[0] * s_f
-                z = c[1]
+            for cc in filtered_coords:
+                x = cc[0] * s_f
+                z = cc[1]
                 if x > 0.1: x += 0.1
                 elif x < -0.1: x -= 0.1
                 if z < props.floor_thickness + 0.1: z -= 0.1
@@ -285,17 +334,25 @@ def rebuild_ship_mesh(obj):
             f_pf = bm.faces.new(pf_verts)       # CCW
             bmesh.ops.triangulate(bm, faces=[f_pb, f_pf])
             
-            for i in range(len(plug_coords)):
-                bm.faces.new((pb_verts[i], pb_verts[(i+1)%len(plug_coords)], pf_verts[(i+1)%len(plug_coords)], pf_verts[i]))
+            for i in range(len(filtered_coords)):
+                bm.faces.new((pb_verts[i], pb_verts[(i+1)%len(filtered_coords)], pf_verts[(i+1)%len(filtered_coords)], pf_verts[i]))
         
         if props.section_type == 'STERN':
-            add_solid_plug(-l2, -l2 + props.wall_thickness) # Transom plug
+            add_solid_plug(-l2, -l2 + props.wall_thickness) # Transom plug (REAR, always closed)
             if props.has_quarterdeck:
-                add_solid_plug(l2 - props.wall_thickness, l2) # Front wall facing MID
+                # Archway / upper wall (parte B)
+                if getattr(props, 'quarterdeck_closed_front', False):
+                    add_solid_plug(l2 - props.wall_thickness, l2, min_z=base_h)
+                else:
+                    add_solid_plug(l2 - props.wall_thickness, l2, min_z=h - 10.0)
         elif props.section_type == 'BOW':
-            add_solid_plug(l2 - props.wall_thickness, l2) # Tip plug
+            add_solid_plug(l2 - props.wall_thickness, l2) # Tip plug (FRONT, always closed)
             if props.has_forecastle:
-                add_solid_plug(-l2, -l2 + props.wall_thickness) # Back wall facing MID
+                # Archway / upper wall (parte B)
+                if getattr(props, 'forecastle_closed_back', False):
+                    add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=base_h)
+                else:
+                    add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=h - 10.0)
                 
         num_verts = len(verts_coords)
         for s in range(num_segments):
@@ -427,67 +484,26 @@ def rebuild_ship_mesh(obj):
             scale_front_deck = 1.0
             scale_back_deck = 0.7
             
-        deck_y_segments = max(1, int((deck_end_y - deck_start_y) / 25.4))
-        seg_len = (deck_end_y - deck_start_y) / deck_y_segments
+        create_deck_planks(bm_deck, deck_start_y, deck_end_y, deck_w2, deck_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2)
         
-        num_deck_planks = 4
-        plank_gap = 0.5
-        pw = (deck_w2 * 2) / num_deck_planks
-        
-        for iy in range(deck_y_segments):
-            sy1 = deck_start_y + iy * seg_len + 0.2
-            sy2 = deck_start_y + (iy + 1) * seg_len - 0.2
+        has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+        if has_castle:
+            lower_z = base_h - 2.0
             
-            planks = []
-            if iy % 2 == 0:
-                for p in range(num_deck_planks):
-                    px1 = -deck_w2 + p * pw
-                    px2 = -deck_w2 + (p + 1) * pw - plank_gap
-                    planks.append((px1, px2))
-            else:
-                px1 = -deck_w2
-                px2 = -deck_w2 + pw / 2 - plank_gap
-                planks.append((px1, px2))
-                for p in range(num_deck_planks - 1):
-                    px1 = -deck_w2 + pw / 2 + p * pw
-                    px2 = -deck_w2 + pw / 2 + (p + 1) * pw - plank_gap
-                    planks.append((px1, px2))
-                px1 = -deck_w2 + pw / 2 + (num_deck_planks - 1) * pw
-                px2 = deck_w2 - plank_gap
-                planks.append((px1, px2))
-            
-            for px1, px2 in planks:
-                if px2 <= px1: continue
-                
-                d_verts = [
-                    (px1, deck_z, 0),
-                    (px2, deck_z, 0),
-                    (px2, deck_z + deck_thickness, 0),
-                    (px1, deck_z + deck_thickness, 0)
-                ]
-                
-                if props.section_type == 'STERN':
-                    p_sy1 = (sy1 - (-l2)) / (2*l2)
-                    p_sy2 = (sy2 - (-l2)) / (2*l2)
-                    sc1 = scale_back_deck + (scale_front_deck - scale_back_deck) * p_sy1
-                    sc2 = scale_back_deck + (scale_front_deck - scale_back_deck) * p_sy2
-                elif props.section_type == 'BOW':
-                    p_sy1 = (sy1 - (-l2)) / (2*l2)
-                    p_sy2 = (sy2 - (-l2)) / (2*l2)
-                    sc1 = scale_back_deck + (scale_front_deck - scale_back_deck) * p_sy1
-                    sc2 = scale_back_deck + (scale_front_deck - scale_back_deck) * p_sy2
+            def get_outer_x_at_z(z):
+                if z >= base_h:
+                    return w2
+                elif z >= mid_h:
+                    d_z = base_h - mid_h
+                    return mid_w2 + (z - mid_h) * ((w2 - mid_w2) / d_z) if d_z > 0 else w2
                 else:
-                    sc1 = 1.0
-                    sc2 = 1.0
+                    d_z = mid_h
+                    return bot_w2 + z * ((mid_w2 - bot_w2) / d_z) if d_z > 0 else bot_w2
+                    
+            outer_lower_w2 = get_outer_x_at_z(base_h)
                 
-                d_back = [bm_deck.verts.new((c[0] * sc1, sy1, c[1])) for c in d_verts]
-                d_front = [bm_deck.verts.new((c[0] * sc2, sy2, c[1])) for c in d_verts]
-                
-                bm_deck.faces.new((d_back[0], d_back[3], d_back[2], d_back[1])) # CW
-                bm_deck.faces.new((d_front[0], d_front[1], d_front[2], d_front[3])) # CCW
-                
-                for i in range(4):
-                    bm_deck.faces.new((d_back[i], d_back[(i+1)%4], d_front[(i+1)%4], d_front[i]))
+            lower_deck_w2 = outer_lower_w2 - props.wall_thickness - tol
+            create_deck_planks(bm_deck, deck_start_y, deck_end_y, lower_deck_w2, lower_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2)
                     
         # Deck mesh finalization moved to the end after accessories
 
@@ -553,6 +569,7 @@ def rebuild_ship_mesh(obj):
         if deck_obj:
             bpy.data.objects.remove(deck_obj, do_unlink=True)
 
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.normal_update()
     bm.to_mesh(obj.data)
     bm.free()
@@ -601,6 +618,13 @@ def rebuild_ship_mesh(obj):
             bmesh.ops.scale(bm_deck_cutter, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])
             bmesh.ops.translate(bm_deck_cutter, vec=(cx, cy, cz), verts=ret['verts'])
             
+            has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+            if has_castle:
+                cz_lower = base_h - 1.0
+                ret_lower = bmesh.ops.create_cube(bm_deck_cutter, size=1.0)
+                bmesh.ops.scale(bm_deck_cutter, vec=(hole_w, hole_len, hole_h), verts=ret_lower['verts'])
+                bmesh.ops.translate(bm_deck_cutter, vec=(cx, cy, cz_lower), verts=ret_lower['verts'])
+                
         if getattr(props, 'has_trapdoor', False):
             td_size = getattr(props, 'trapdoor_size', 1.0) * 25.4
             y_off = getattr(props, 'trapdoor_y_offset', 0.0)
@@ -637,7 +661,7 @@ def rebuild_ship_mesh(obj):
                 deck_obj.modifiers.remove(mod_deck)
     # ----------------------------
 
-    ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h)
+    ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h)
 
     # Post-boolean additions: Railings and Mast (placed in a separate object to avoid exact solver bugs)
     rail_name = obj.name + "_Accesorios"
@@ -762,30 +786,47 @@ def rebuild_ship_mesh(obj):
                     bmesh.ops.translate(bm, vec=(px, py, z + rh/2.0), verts=ret['verts'])
     
             off_in = getattr(props, 'railing_offset_inward', 0.5)
-            # Apply offset inward relative to the outer edge
-            x_bl = -top_w2 * sc_back + off_in
-            x_fl = -top_w2 * sc_front + off_in
-            x_br = top_w2 * sc_back - off_in
-            x_fr = top_w2 * sc_front - off_in
+            
+            # Helper to get precisely mathematically offset railing points for right side (x > 0)
+            def get_shifted_railing(w_back, w_front, y_start, y_end, offset):
+                dx = w_front - w_back
+                dy = y_end - y_start
+                L_line = math.hypot(dx, dy)
+                if L_line < 0.001:
+                    return w_back - offset, w_front - offset
+                nx = -dy / L_line
+                ny = dx / L_line
+                Px = w_back + offset * nx
+                Py = y_start + offset * ny
+                t_start = (y_start - Py) / dy if dy != 0 else 0
+                x_start = Px + t_start * dx
+                t_end = (y_end - Py) / dy if dy != 0 else 0
+                x_end = Px + t_end * dx
+                return x_start, x_end, Px, Py, dx, dy
+
+            w_back = top_w2 * sc_back
+            w_front = top_w2 * sc_front
+            x_br, x_fr, Px, Py, d_x, d_y = get_shifted_railing(w_back, w_front, -l2, l2, off_in)
             
             y_fl = l2
             y_fr = l2
             
             if props.section_type == 'BOW':
-                x_fl = 0.0
-                x_fr = 0.0
-                y_fl = l2 - 1.5
-                y_fr = l2 - 1.5
+                # For the bow, find exactly where the railing intersects the side of the capping post
+                y_post = l2 - (rt + 2 * off_in) * l2 / top_w2
+                t_post = (y_post - Py) / d_y if d_y != 0 else 0
+                x_fr = Px + t_post * d_x
+                y_fr = y_post
+                x_fl = -x_fr
+                y_fl = y_post
             else:
-                if x_fl > 0 and x_bl < 0:
-                    t = (0 - x_bl) / (x_fl - x_bl)
-                    y_fl = -l2 + t * (2 * l2)
-                    x_fl = 0.0
-                    
                 if x_fr < 0 and x_br > 0:
                     t = (0 - x_br) / (x_fr - x_br)
                     y_fr = -l2 + t * (2 * l2)
                     x_fr = 0.0
+                x_fl = -x_fr
+                
+            x_bl = -x_br
             
             # Center the back railing on the back wall (thickness = 1.2, move inward 1.5 = 2.1)
             trim_s = 2.1 if props.section_type == 'STERN' else 0.0
@@ -795,7 +836,7 @@ def rebuild_ship_mesh(obj):
                 # Add a capping post at the tip
                 ret = bmesh.ops.create_cube(bm_final, size=1.0)
                 bmesh.ops.scale(bm_final, vec=(rt, rt, rh), verts=ret['verts'])
-                bmesh.ops.translate(bm_final, vec=(0, l2 - 1.5, h + rh/2.0), verts=ret['verts'])
+                bmesh.ops.translate(bm_final, vec=(0, y_post, h + rh/2.0), verts=ret['verts'])
                 
                 # Trim the side railings so their handrails end exactly inside the post
                 # The handrail extends rt/2 past the end point, so we trim by rt/2
@@ -821,7 +862,7 @@ def rebuild_ship_mesh(obj):
         if rail_obj:
             bpy.data.objects.remove(rail_obj, do_unlink=True)
 
-def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h):
+def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     def apply_modifier_safely(target_obj, mod_name):
         mod = target_obj.modifiers.get(mod_name)
         if not mod: return
@@ -862,18 +903,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h):
     
 
     if not gen_wall and not gen_floor and not has_mast and not has_trapdoor:
-
-        if cutter_obj:
-
-            bpy.data.objects.remove(cutter_obj, do_unlink=True)
-
-            for mod in obj.modifiers:
-
-                if mod.name == "PlankCuts" or mod.name == cutter_name:
-
-                    obj.modifiers.remove(mod)
-
-        return
+        pass # We no longer return early because we ALWAYS need to generate connector slots!
 
         
 
@@ -948,17 +978,14 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h):
 
                 
 
-                if z_c < mid_h:
-
-                    p0 = z_c / mid_h if mid_h > 0 else 0
-
-                    w_at_z = bot_w2 + (mid_w2 - bot_w2) * p0
-
+                if z_c >= base_h:
+                    w_at_z = top_w2
+                elif z_c >= mid_h:
+                    d_z = base_h - mid_h
+                    w_at_z = mid_w2 + (z_c - mid_h) * ((top_w2 - mid_w2) / d_z) if d_z > 0 else top_w2
                 else:
-
-                    p0 = (z_c - mid_h) / (h - mid_h) if h > mid_h else 0
-
-                    w_at_z = mid_w2 + (top_w2 - mid_w2) * p0
+                    d_z = mid_h
+                    w_at_z = bot_w2 + z_c * ((mid_w2 - bot_w2) / d_z) if d_z > 0 else bot_w2
 
                     
 
@@ -1197,6 +1224,58 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h):
 
 
 
+    # 4. Connector Slots
+    peg_l2 = 10.0
+    slot_verts = [
+        (-3.0, -0.1, 0),
+        (-5.0, 3.0, 0),
+        (5.0, 3.0, 0),
+        (3.0, -0.1, 0)
+    ]
+    def add_continuous_slot_cutter():
+        if props.section_type == 'MID':
+            y_back = -l2 - 0.1
+            y_front = l2 + 0.1
+        elif props.section_type == 'BOW':
+            y_back = -l2 - 0.1
+            y_front = (l2 * 0.5) + 0.01 # Add tiny epsilon to avoid coplanar grid line
+        elif props.section_type == 'STERN':
+            y_back = (-l2 * 0.5) - 0.01
+            y_front = l2 + 0.1
+        else:
+            return
+            
+        slot_cutter_name = obj.name + "_SlotCuts"
+        slot_cutter_obj = bpy.data.objects.get(slot_cutter_name)
+        if not slot_cutter_obj:
+            slot_mesh = bpy.data.meshes.new(slot_cutter_name)
+            slot_cutter_obj = bpy.data.objects.new(slot_cutter_name, slot_mesh)
+            bpy.context.collection.objects.link(slot_cutter_obj)
+            slot_cutter_obj.hide_viewport = True
+            slot_cutter_obj.hide_render = True
+            
+        bm_slot = bmesh.new()
+            
+        p_back = [bm_slot.verts.new((c[0], y_back, c[1])) for c in slot_verts]
+        p_front = [bm_slot.verts.new((c[0], y_front, c[1])) for c in slot_verts]
+        
+        bm_slot.faces.new((p_back[0], p_back[3], p_back[2], p_back[1])) # CW -> Outwards (-Y)
+        bm_slot.faces.new((p_front[0], p_front[1], p_front[2], p_front[3])) # CCW -> Outwards (+Y)
+        for i in range(4):
+            bm_slot.faces.new((p_back[i], p_back[(i+1)%4], p_front[(i+1)%4], p_front[i]))
+            
+        bm_slot.to_mesh(slot_cutter_obj.data)
+        bm_slot.free()
+        
+        mod = obj.modifiers.get("SlotCuts")
+        if not mod:
+            mod = obj.modifiers.new("SlotCuts", 'BOOLEAN')
+        mod.operation = 'DIFFERENCE'
+        mod.object = slot_cutter_obj
+        mod.solver = 'EXACT'
+
+    add_continuous_slot_cutter()
+        
     # The geometry is now fully manifold and cutter depths have been adjusted.
     # We NO LONGER apply a microscopic offset/rotation, as near-misses actually crash the EXACT solver in Blender 3.0.
     
@@ -1204,6 +1283,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h):
     bm.free()
     
     apply_modifier_safely(obj, "PlankCuts")
+    apply_modifier_safely(obj, "SlotCuts")
     
     deck_obj = bpy.data.objects.get(obj.name + "_Deck")
     if deck_obj:
@@ -1215,6 +1295,11 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h):
     # and occasionally appear in the viewport.
     if cutter_obj:
         bpy.data.objects.remove(cutter_obj, do_unlink=True)
+        
+    slot_cutter_name = obj.name + "_SlotCuts"
+    slot_cutter_obj = bpy.data.objects.get(slot_cutter_name)
+    if slot_cutter_obj:
+        bpy.data.objects.remove(slot_cutter_obj, do_unlink=True)
         
     # deck_cutter_obj might not be in local scope if it wasn't generated this frame,
     # so we fetch it by name to be absolutely sure we delete it if it exists.
