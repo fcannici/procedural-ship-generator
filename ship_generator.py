@@ -923,7 +923,6 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     mod.operation = 'DIFFERENCE'
     mod.object = cutter_obj
     mod.solver = 'EXACT'
-    if hasattr(mod, 'use_self'): mod.use_self = True
     if hasattr(mod, 'use_hole_tolerant'): mod.use_hole_tolerant = True
 
         
@@ -1253,7 +1252,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
             y_front = l2 + 0.1
         elif props.section_type == 'BOW':
             y_back = -l2 - 0.1
-            y_front = 0.0
+            y_front = 0.123
         elif props.section_type == 'STERN':
             y_back = -l2 - 0.1
             y_front = l2 + 0.1
@@ -1290,7 +1289,6 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
         mod.operation = 'DIFFERENCE'
         mod.object = slot_cutter_obj
         mod.solver = 'EXACT'
-        if hasattr(mod, 'use_self'): mod.use_self = True
         if hasattr(mod, 'use_hole_tolerant'): mod.use_hole_tolerant = True
 
     add_continuous_slot_cutter()
