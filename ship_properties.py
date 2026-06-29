@@ -61,6 +61,11 @@ def update_no_sync(self, context):
             context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
     _realign_ship(context)
 
+def update_stair_level(self, context):
+    if self.level == 'MAIN_CASTLE':
+        self.direction = 'OUTWARD'
+    update_no_sync(self, context)
+
 def _sync_prop(self, context, prop_name):
     global _updating_all
     from .ship_generator import rebuild_ship_mesh
@@ -99,8 +104,11 @@ def update_tiles_width(self, context): _sync_prop(self, context, 'tiles_width')
 def update_wall_height(self, context): _sync_prop(self, context, 'wall_height')
 def update_wall_thickness(self, context): _sync_prop(self, context, 'wall_thickness')
 def update_floor_thickness(self, context): _sync_prop(self, context, 'floor_thickness')
+def update_deck_width_offset(self, context): _sync_prop(self, context, 'deck_width_offset')
 def update_has_grid(self, context): _sync_prop(self, context, 'has_grid')
 def update_tolerance(self, context): _sync_prop(self, context, 'tolerance')
+def update_clip_tightness(self, context): _sync_prop(self, context, 'clip_tightness')
+def update_clip_length_offset(self, context): _sync_prop(self, context, 'clip_length_offset')
 def update_plank_height(self, context): _sync_prop(self, context, 'plank_height')
 def update_lapstrake_depth(self, context): _sync_prop(self, context, 'lapstrake_depth')
 def update_generate_plank_cuts(self, context): _sync_prop(self, context, 'generate_plank_cuts')
@@ -122,7 +130,7 @@ class StairItem(bpy.types.PropertyGroup):
             ('MAIN_CASTLE', "Principal a Castillo", "Conecta la cubierta principal con el castillo (si existe)")
         ],
         default='BODEGA_MAIN',
-        update=update_no_sync
+        update=update_stair_level
     )
     direction: bpy.props.EnumProperty(
         name="Dirección",
@@ -260,6 +268,22 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
+    generate_deck_ledge: bpy.props.BoolProperty(
+        name="Generar Soporte para Cubierta (Cuña)",
+        description="Añade una cuña de 45 grados en el muro interior para que la cubierta descanse sin necesidad de soportes de impresión",
+        default=True,
+        update=update_no_sync
+    )
+    
+    deck_ledge_width: bpy.props.FloatProperty(
+        name="Ancho de la Cuña (mm)",
+        description="Qué tanto sobresale la cuña hacia adentro",
+        default=2.0,
+        min=0.5,
+        max=10.0,
+        update=update_no_sync
+    )
+    
     generate_stairs: bpy.props.BoolProperty(
         name="Generar Escaleras",
         description="Añade escaleras integradas a los castillos para las miniaturas",
@@ -281,6 +305,17 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_floor_thickness
     )
     
+    deck_width_offset: bpy.props.FloatProperty(
+        name="Compensación Ancho Cubierta (mm)",
+        description="Ajuste fino para el ancho de la cubierta (positivo = más ancho, negativo = más angosto)",
+        default=0.0,
+        min=-10.0,
+        max=10.0,
+        step=10,
+        precision=2,
+        update=update_deck_width_offset
+    )
+    
     has_grid: bpy.props.BoolProperty(
         name="Generar Cuadrícula",
         description="Esculpe una cuadrícula de 1 pulgada en el suelo",
@@ -297,12 +332,34 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
     
     tolerance: bpy.props.FloatProperty(
         name="Tolerancia FDM (mm)",
-        description="Tolerancia para encastres",
+        description="Tolerancia general para encastres",
         default=0.2,
         min=0.0,
         step=1,
         precision=2,
         update=update_tolerance
+    )
+    
+    clip_tightness: bpy.props.FloatProperty(
+        name="Ajuste de Grosor (Apriete)",
+        description="Aumentar para que el clip quede más gordo (apretado). Disminuir para más suelto.",
+        default=0.0,
+        min=-0.5,
+        max=0.5,
+        step=1,
+        precision=2,
+        update=update_clip_tightness
+    )
+    
+    clip_length_offset: bpy.props.FloatProperty(
+        name="Ajuste de Largo",
+        description="Aumentar para hacer el clip más largo (eje Y). Disminuir para más corto.",
+        default=0.0,
+        min=-2.0,
+        max=2.0,
+        step=1,
+        precision=2,
+        update=update_clip_length_offset
     )
     
     plank_height: bpy.props.FloatProperty(

@@ -9,59 +9,234 @@ def create_grid(bm, x_min, x_max, y_min, y_max, z, grid_size=25.4, depth=0.5, wi
     pass
 
 
-def create_deck_planks(bm_deck, start_y, end_y, w2, z, thickness, scale_front, scale_back, section_type, l2):
+def create_deck_planks(bm_deck, start_y, end_y, w2_bot, w2_top, z, thickness, scale_front, scale_back, section_type, l2, has_grid=False):
     deck_y_segments = max(1, int((end_y - start_y) / 25.4))
     seg_len = (end_y - start_y) / deck_y_segments
     num_deck_planks = 4
     plank_gap = 0.5
-    pw = (w2 * 2) / num_deck_planks
-    for iy in range(deck_y_segments):
-        sy1 = start_y + iy * seg_len + 0.2
-        sy2 = start_y + (iy + 1) * seg_len - 0.2
-        planks = []
-        if iy % 2 == 0:
-            for p in range(num_deck_planks):
-                px1 = -w2 + p * pw
-                px2 = -w2 + (p + 1) * pw - plank_gap
-                planks.append((px1, px2))
+    pw = (w2_top * 2) / num_deck_planks
+    base_thickness = 1.0
+    w2_mid = (w2_bot + w2_top) / 2.0
+    
+    # 1. Generate the solid continuous base
+    num_base_segments = 1 if section_type == 'MID' else 12
+    base_segments = []
+    
+    for i in range(num_base_segments + 1):
+        t = i / num_base_segments
+        y = start_y + (end_y - start_y) * t
+        
+        if section_type in ('STERN', 'BOW'):
+            p_y = (y - (-l2)) / (2*l2) if l2 > 0 else 0
+            sc = scale_back + (scale_front - scale_back) * p_y
         else:
-            px1 = -w2
-            px2 = -w2 + pw / 2 - plank_gap
-            planks.append((px1, px2))
-            for p in range(num_deck_planks - 1):
-                px1 = -w2 + pw / 2 + p * pw
-                px2 = -w2 + pw / 2 + (p + 1) * pw - plank_gap
-                planks.append((px1, px2))
-            px1 = -w2 + pw / 2 + (num_deck_planks - 1) * pw
-            px2 = w2 - plank_gap
-            planks.append((px1, px2))
-        for px1, px2 in planks:
-            if px2 <= px1: continue
-            d_verts = [
-                (px1, z, 0),
-                (px2, z, 0),
-                (px2, z + thickness, 0),
-                (px1, z + thickness, 0)
-            ]
-            if section_type == 'STERN':
-                p_sy1 = (sy1 - (-l2)) / (2*l2) if l2 > 0 else 0
-                p_sy2 = (sy2 - (-l2)) / (2*l2) if l2 > 0 else 0
-                sc1 = scale_back + (scale_front - scale_back) * p_sy1
-                sc2 = scale_back + (scale_front - scale_back) * p_sy2
-            elif section_type == 'BOW':
-                p_sy1 = (sy1 - (-l2)) / (2*l2) if l2 > 0 else 0
-                p_sy2 = (sy2 - (-l2)) / (2*l2) if l2 > 0 else 0
-                sc1 = scale_back + (scale_front - scale_back) * p_sy1
-                sc2 = scale_back + (scale_front - scale_back) * p_sy2
+            sc = 1.0
+            
+        verts = [
+            bm_deck.verts.new((-w2_bot * sc, y, z)),
+            bm_deck.verts.new((w2_bot * sc, y, z)),
+            bm_deck.verts.new((w2_top * sc, y, z + base_thickness)),
+            bm_deck.verts.new((-w2_top * sc, y, z + base_thickness))
+        ]
+        base_segments.append(verts)
+        
+    for i in range(num_base_segments):
+        v1 = base_segments[i]
+        v2 = base_segments[i+1]
+        if i == 0:
+            bm_deck.faces.new((v1[0], v1[1], v1[2], v1[3]))
+        if i == num_base_segments - 1:
+            bm_deck.faces.new((v2[0], v2[3], v2[2], v2[1]))
+            
+        bm_deck.faces.new((v1[0], v2[0], v2[1], v1[1])) # Bottom
+        bm_deck.faces.new((v1[3], v1[2], v2[2], v2[3])) # Top
+        bm_deck.faces.new((v1[0], v1[3], v2[3], v2[0])) # Left
+        bm_deck.faces.new((v1[1], v2[1], v2[2], v1[2])) # Right
+
+    # 2. Generate the individual planks on top of the base
+    grid_size = 25.4
+    groove_width = 1.0
+    plank_gap = 0.5
+    
+    if has_grid:
+        max_idx_x = int(math.ceil(w2_top / grid_size))
+        min_iy = int(math.floor(start_y / grid_size)) - 1
+        max_iy = int(math.ceil(end_y / grid_size)) + 1
+        
+        for ix in range(-max_idx_x, max_idx_x):
+            for iy in range(min_iy, max_iy):
+                cx = (ix + 0.5) * grid_size
+                cy = (iy + 0.5) * grid_size
+                
+                tx1 = cx - (grid_size/2.0) + groove_width
+                tx2 = cx + (grid_size/2.0) - groove_width
+                ty1 = cy - (grid_size/2.0) + groove_width
+                ty2 = cy + (grid_size/2.0) - groove_width
+                
+                valid_ty1 = max(ty1, start_y + groove_width)
+                valid_ty2 = min(ty2, end_y - groove_width)
+                
+                if valid_ty1 >= valid_ty2:
+                    continue
+                    
+                p_ty1 = (valid_ty1 - (-l2)) / (2*l2) if l2 > 0 else 0
+                p_ty2 = (valid_ty2 - (-l2)) / (2*l2) if l2 > 0 else 0
+                
+                if section_type in ('STERN', 'BOW'):
+                    sc1 = scale_back + (scale_front - scale_back) * p_ty1
+                    sc2 = scale_back + (scale_front - scale_back) * p_ty2
+                else:
+                    sc1 = 1.0
+                    sc2 = 1.0
+                    
+                w_top_1 = w2_top * sc1
+                w_top_2 = w2_top * sc2
+                w_mid_1 = w2_bot * sc1
+                w_mid_2 = w2_bot * sc2
+                
+                min_w_top = min(w_top_1, w_top_2)
+                min_w_mid = min(w_mid_1, w_mid_2)
+                
+                valid_tx1 = max(tx1, -min_w_top + groove_width)
+                valid_tx2 = min(tx2, min_w_top - groove_width)
+                
+                if valid_tx1 >= valid_tx2:
+                    continue
+                    
+                num_planks = 3
+                full_w = tx2 - tx1
+                if full_w <= 0: continue
+                pw = full_w / num_planks
+                planks = []
+                for p in range(num_planks):
+                    px1 = tx1 + p * pw
+                    px2 = tx1 + (p + 1) * pw - plank_gap
+                    if px2 > px1:
+                        planks.append((px1, px2))
+                        
+                for px1, px2 in planks:
+                    p1_top_b = max(min(px1, w_top_1), -w_top_1)
+                    p2_top_b = max(min(px2, w_top_1), -w_top_1)
+                    p1_bot_b = max(min(px1, w_mid_1), -w_mid_1)
+                    p2_bot_b = max(min(px2, w_mid_1), -w_mid_1)
+                    
+                    p1_top_f = max(min(px1, w_top_2), -w_top_2)
+                    p2_top_f = max(min(px2, w_top_2), -w_top_2)
+                    p1_bot_f = max(min(px1, w_mid_2), -w_mid_2)
+                    p2_bot_f = max(min(px2, w_mid_2), -w_mid_2)
+                    
+                    back_valid = (p2_top_b - p1_top_b >= 0.01)
+                    front_valid = (p2_top_f - p1_top_f >= 0.01)
+                    
+                    if not back_valid and not front_valid:
+                        continue
+                        
+                    if back_valid and front_valid:
+                        d_back = [
+                            bm_deck.verts.new((p1_bot_b, valid_ty1, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_bot_b, valid_ty1, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_top_b, valid_ty1, z + thickness)),
+                            bm_deck.verts.new((p1_top_b, valid_ty1, z + thickness))
+                        ]
+                        d_front = [
+                            bm_deck.verts.new((p1_bot_f, valid_ty2, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_bot_f, valid_ty2, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_top_f, valid_ty2, z + thickness)),
+                            bm_deck.verts.new((p1_top_f, valid_ty2, z + thickness))
+                        ]
+                        bm_deck.faces.new((d_back[0], d_back[1], d_back[2], d_back[3])) # Back
+                        bm_deck.faces.new((d_front[0], d_front[3], d_front[2], d_front[1])) # Front
+                        bm_deck.faces.new((d_back[0], d_back[3], d_front[3], d_front[0])) # Left
+                        bm_deck.faces.new((d_back[1], d_front[1], d_front[2], d_back[2])) # Right
+                        bm_deck.faces.new((d_back[3], d_back[2], d_front[2], d_front[3])) # Top
+                        bm_deck.faces.new((d_back[0], d_front[0], d_front[1], d_back[1])) # Bottom
+                            
+                    elif back_valid and not front_valid:
+                        d_back = [
+                            bm_deck.verts.new((p1_bot_b, valid_ty1, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_bot_b, valid_ty1, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_top_b, valid_ty1, z + thickness)),
+                            bm_deck.verts.new((p1_top_b, valid_ty1, z + thickness))
+                        ]
+                        f_bot = bm_deck.verts.new((p1_bot_f, valid_ty2, z + base_thickness - 0.1))
+                        f_top = bm_deck.verts.new((p1_top_f, valid_ty2, z + thickness))
+                        
+                        bm_deck.faces.new((d_back[0], d_back[1], d_back[2], d_back[3])) # Back
+                        bm_deck.faces.new((d_back[0], d_back[3], f_top, f_bot)) # Left
+                        bm_deck.faces.new((d_back[1], f_bot, f_top, d_back[2])) # Right
+                        bm_deck.faces.new((d_back[3], d_back[2], f_top)) # Top
+                        bm_deck.faces.new((d_back[0], f_bot, d_back[1])) # Bottom
+                        
+                    elif not back_valid and front_valid:
+                        d_front = [
+                            bm_deck.verts.new((p1_bot_f, valid_ty2, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_bot_f, valid_ty2, z + base_thickness - 0.1)),
+                            bm_deck.verts.new((p2_top_f, valid_ty2, z + thickness)),
+                            bm_deck.verts.new((p1_top_f, valid_ty2, z + thickness))
+                        ]
+                        b_bot = bm_deck.verts.new((p1_bot_b, valid_ty1, z + base_thickness - 0.1))
+                        b_top = bm_deck.verts.new((p1_top_b, valid_ty1, z + thickness))
+                        
+                        bm_deck.faces.new((d_front[0], d_front[3], d_front[2], d_front[1])) # Front
+                        bm_deck.faces.new((d_front[0], b_bot, b_top, d_front[3])) # Left
+                        bm_deck.faces.new((d_front[1], d_front[2], b_top, b_bot)) # Right
+                        bm_deck.faces.new((d_front[3], b_top, d_front[2])) # Top
+                        bm_deck.faces.new((d_front[0], d_front[1], b_bot)) # Bottom
+    else:
+        for iy in range(deck_y_segments):
+            sy1 = start_y + iy * seg_len + 0.2
+            sy2 = start_y + (iy + 1) * seg_len - 0.2
+            planks = []
+            if iy % 2 == 0:
+                for p in range(num_deck_planks):
+                    px1 = -w2_top + p * pw
+                    px2 = -w2_top + (p + 1) * pw - plank_gap
+                    planks.append((px1, px2))
             else:
-                sc1 = 1.0
-                sc2 = 1.0
-            d_back = [bm_deck.verts.new((c[0] * sc1, sy1, c[1])) for c in d_verts]
-            d_front = [bm_deck.verts.new((c[0] * sc2, sy2, c[1])) for c in d_verts]
-            bm_deck.faces.new((d_back[0], d_back[3], d_back[2], d_back[1]))
-            bm_deck.faces.new((d_front[0], d_front[1], d_front[2], d_front[3]))
-            for i in range(4):
-                bm_deck.faces.new((d_back[i], d_back[(i+1)%4], d_front[(i+1)%4], d_front[i]))
+                px1 = -w2_top
+                px2 = -w2_top + pw / 2 - plank_gap
+                planks.append((px1, px2))
+                for p in range(num_deck_planks - 1):
+                    px1 = -w2_top + pw / 2 + p * pw
+                    px2 = -w2_top + pw / 2 + (p + 1) * pw - plank_gap
+                    planks.append((px1, px2))
+                px1 = -w2_top + pw / 2 + (num_deck_planks - 1) * pw
+                px2 = w2_top - plank_gap
+                planks.append((px1, px2))
+            for px1, px2 in planks:
+                if px2 <= px1: continue
+                
+                p1_bot = max(min(px1, w2_bot), -w2_bot)
+                p2_bot = max(min(px2, w2_bot), -w2_bot)
+                p1_top = max(min(px1, w2_top), -w2_top)
+                p2_top = max(min(px2, w2_top), -w2_top)
+                
+                if (p2_bot - p1_bot < 0.01) and (p2_top - p1_top < 0.01): continue
+                
+                d_verts = [
+                    (p1_bot, z + base_thickness, 0),
+                    (p2_bot, z + base_thickness, 0),
+                    (p2_top, z + thickness, 0),
+                    (p1_top, z + thickness, 0)
+                ]
+                if section_type in ('STERN', 'BOW'):
+                    p_sy1 = (sy1 - (-l2)) / (2*l2) if l2 > 0 else 0
+                    p_sy2 = (sy2 - (-l2)) / (2*l2) if l2 > 0 else 0
+                    sc1 = scale_back + (scale_front - scale_back) * p_sy1
+                    sc2 = scale_back + (scale_front - scale_back) * p_sy2
+                else:
+                    sc1 = 1.0
+                    sc2 = 1.0
+                d_back = [bm_deck.verts.new((c[0] * sc1, sy1, c[1])) for c in d_verts]
+                d_front = [bm_deck.verts.new((c[0] * sc2, sy2, c[1])) for c in d_verts]
+                bm_deck.faces.new((d_back[0], d_back[1], d_back[2], d_back[3])) # Back
+                bm_deck.faces.new((d_front[0], d_front[3], d_front[2], d_front[1])) # Front
+                bm_deck.faces.new((d_back[0], d_back[3], d_front[3], d_front[0])) # Left
+                bm_deck.faces.new((d_back[1], d_front[1], d_front[2], d_back[2])) # Right
+                bm_deck.faces.new((d_back[3], d_back[2], d_front[2], d_front[3])) # Top
+                bm_deck.faces.new((d_back[0], d_front[0], d_front[1], d_back[1])) # Bottom
+                
+    bmesh.ops.remove_doubles(bm_deck, verts=bm_deck.verts, dist=0.001)
 
 def build_hull(bm, props):
 
@@ -75,6 +250,8 @@ def rebuild_ship_mesh(obj):
     if not obj or obj.type != 'MESH':
         return
         
+    bpy.context.view_layer.update()
+        
     props = obj.ship_generator
     if not props.is_ship and not props.is_connector_clip:
         return
@@ -85,8 +262,8 @@ def rebuild_ship_mesh(obj):
     bm = bmesh.new()
     
     if props.is_connector_clip:
-        tol = props.tolerance
-        peg_l2 = 10.0 # 20mm length
+        tol = props.tolerance - props.clip_tightness
+        peg_l2 = 10.0 + props.clip_length_offset # 20mm length by default
         p_verts = [
             (-3.0 + tol, 0, 0),
             (-5.0 + tol, 3.0 - tol, 0),
@@ -188,11 +365,43 @@ def rebuild_ship_mesh(obj):
     inner_floor_x = get_inner_x_at_z(ft)
     
     inner_right = []
-    for p in reversed(outer_right_profile):
-        z = p[1]
-        if z <= ft: continue
-        inner_right.append((get_inner_x_at_z(z), z, 0))
+    has_ledge = getattr(props, 'generate_deck_ledge', True)
+    ledge_w = getattr(props, 'deck_ledge_width', 2.0)
+    
+    deck_z = h - 2.0 if props.generate_top_deck else h
+    
+    raw_zs = [p[1] for p in reversed(outer_right_profile) if p[1] > ft]
+    
+    if has_ledge and deck_z > ft + ledge_w:
+        final_zs = []
+        for z in raw_zs:
+            if z > deck_z:
+                final_zs.append((z, get_inner_x_at_z(z)))
+            elif z < deck_z - ledge_w:
+                final_zs.append((z, get_inner_x_at_z(z)))
+                
+        insert_idx = 0
+        for i, (z, x) in enumerate(final_zs):
+            if z < deck_z:
+                insert_idx = i
+                break
+        else:
+            insert_idx = len(final_zs)
+            
+        ledge_points = [
+            (deck_z, get_inner_x_at_z(deck_z)),
+            (deck_z, get_inner_x_at_z(deck_z) - ledge_w),
+            (deck_z - ledge_w, get_inner_x_at_z(deck_z - ledge_w))
+        ]
         
+        final_zs = final_zs[:insert_idx] + ledge_points + final_zs[insert_idx:]
+        
+        for z, x in final_zs:
+            inner_right.append((x, z, 0))
+    else:
+        for z in raw_zs:
+            inner_right.append((get_inner_x_at_z(z), z, 0))
+            
     inner_right.append((inner_floor_x, ft, 0))
     inner_left = [(-p[0], p[1], 0) for p in reversed(inner_right)]
         
@@ -234,48 +443,48 @@ def rebuild_ship_mesh(obj):
         f6 = bm.faces.new([segments[-1][i] for i in floor_cap_indices])
         bmesh.ops.triangulate(bm, faces=[f3, f6])
         
-        # Manual quad caps for walls to prevent triangulator tearing on deep lapstrake zigzags
+        # Monotonic path triangulation for walls to prevent triangulator tearing
+        # and to properly handle cases where K (inner vertices) > M (outer vertices).
         M = len_outer_left + 1 # Number of vertices in outer_right_profile
         K = len_inner_right - 1 # Number of corresponding valid inner vertices above the floor
         
-        for i in range(M - 1):
-            # Left Wall indices
-            o1_idx = i
-            o2_idx = i + 1
-            i1_local = max(0, K - i)
-            i2_local = max(0, K - (i + 1))
-            i1_idx = idx_inner_left + i1_local
-            i2_idx = idx_inner_left + i2_local
+        path = [(0, K)]
+        o, i = 0, K
+        while o < M - 1 or i > 0:
+            prog_o = (o + 1) / (M - 1) if M > 1 else 1.0
+            prog_i = (K - (i - 1)) / K if K > 0 else 1.0
             
-            if i1_local == i2_local:
-                # Back (CW)
-                bm.faces.new((segments[0][o1_idx], segments[0][i1_idx], segments[0][o2_idx]))
-                # Front (CCW)
-                bm.faces.new((segments[-1][o1_idx], segments[-1][o2_idx], segments[-1][i1_idx]))
+            if o < M - 1 and (i == 0 or prog_o <= prog_i):
+                o += 1
             else:
-                # Back (CW)
-                bm.faces.new((segments[0][o1_idx], segments[0][i1_idx], segments[0][i2_idx], segments[0][o2_idx]))
-                # Front (CCW)
-                bm.faces.new((segments[-1][o1_idx], segments[-1][o2_idx], segments[-1][i2_idx], segments[-1][i1_idx]))
+                i -= 1
+            path.append((o, i))
             
-            # Right Wall indices
-            ro1_idx = idx_outer_right + i
-            ro2_idx = idx_outer_right + i + 1
-            ri1_local = M - 1 - i if i >= M - K else K
-            ri2_local = M - 1 - (i + 1) if (i + 1) >= M - K else K
-            ri1_idx = idx_inner_right + ri1_local
-            ri2_idx = idx_inner_right + ri2_local
+        for p_idx in range(len(path) - 1):
+            o1, i1 = path[p_idx]
+            o2, i2 = path[p_idx+1]
             
-            if ri1_local == ri2_local:
-                # Back (CW)
-                bm.faces.new((segments[0][ro1_idx], segments[0][ri1_idx], segments[0][ro2_idx]))
-                # Front (CCW)
-                bm.faces.new((segments[-1][ro1_idx], segments[-1][ro2_idx], segments[-1][ri1_idx]))
+            # Left Wall Triangles
+            ol1, ol2 = o1, o2
+            il1, il2 = idx_inner_left + i1, idx_inner_left + i2
+            
+            if o1 == o2:
+                bm.faces.new((segments[0][ol1], segments[0][il2], segments[0][il1]))
+                bm.faces.new((segments[-1][ol1], segments[-1][il1], segments[-1][il2]))
             else:
-                # Back (CW)
-                bm.faces.new((segments[0][ro1_idx], segments[0][ri1_idx], segments[0][ri2_idx], segments[0][ro2_idx]))
-                # Front (CCW)
-                bm.faces.new((segments[-1][ro1_idx], segments[-1][ro2_idx], segments[-1][ri2_idx], segments[-1][ri1_idx]))
+                bm.faces.new((segments[0][ol1], segments[0][ol2], segments[0][il1]))
+                bm.faces.new((segments[-1][ol1], segments[-1][il1], segments[-1][ol2]))
+                
+            # Right Wall Triangles
+            or1, or2 = idx_outer_right + (M - 1 - o1), idx_outer_right + (M - 1 - o2)
+            ir1, ir2 = idx_inner_right + (K - i1), idx_inner_right + (K - i2)
+            
+            if o1 == o2:
+                bm.faces.new((segments[0][or1], segments[0][ir1], segments[0][ir2]))
+                bm.faces.new((segments[-1][or1], segments[-1][ir2], segments[-1][ir1]))
+            else:
+                bm.faces.new((segments[0][or1], segments[0][ir1], segments[0][or2]))
+                bm.faces.new((segments[-1][or1], segments[-1][or2], segments[-1][ir1]))
 
         # === Solid Plugs to Close the Ship's Interior ===
         plug_coords = [verts_coords[i] for i in range(idx_inner_right, len(verts_coords))]
@@ -398,63 +607,76 @@ def rebuild_ship_mesh(obj):
                 if props.section_type == 'BOW':
                     progress_start = (valid_ty1 - (-l2)) / (2*l2)
                     progress_end = (valid_ty2 - (-l2)) / (2*l2)
-                    allowed_w2_start = inner_floor_x * (1.0 - progress_start)
-                    allowed_w2_end = inner_floor_x * (1.0 - progress_end)
-                    allowed_w2 = min(allowed_w2_start, allowed_w2_end)
+                    w2_start = inner_floor_x * (1.0 - progress_start)
+                    w2_end = inner_floor_x * (1.0 - progress_end)
                 elif props.section_type == 'STERN':
                     progress_start = (valid_ty1 - (-l2)) / (2*l2)
                     progress_end = (valid_ty2 - (-l2)) / (2*l2)
-                    allowed_w2_start = inner_floor_x * (0.7 + 0.3 * progress_start)
-                    allowed_w2_end = inner_floor_x * (0.7 + 0.3 * progress_end)
-                    allowed_w2 = min(allowed_w2_start, allowed_w2_end)
+                    w2_start = inner_floor_x * (0.7 + 0.3 * progress_start)
+                    w2_end = inner_floor_x * (0.7 + 0.3 * progress_end)
                 else:
-                    allowed_w2 = inner_floor_x
-                    
-                valid_tx1 = max(tx1, -allowed_w2 + groove_width)
-                valid_tx2 = min(tx2, allowed_w2 - groove_width)
-                
-                if valid_tx1 >= valid_tx2:
-                    continue
+                    w2_start = inner_floor_x
+                    w2_end = inner_floor_x
                     
                 plank_gap = 0.4
-                total_w = valid_tx2 - valid_tx1
-                
-                if total_w <= 0:
-                    continue
-                    
                 num_main_planks = 2
-                pw = total_w / num_main_planks
+                full_w = tx2 - tx1
+                if full_w <= 0: continue
+                pw = full_w / num_main_planks
                 planks = []
                 
                 if iy % 2 == 0:
                     for p in range(num_main_planks):
-                        px1 = valid_tx1 + p * pw
-                        px2 = valid_tx1 + (p + 1) * pw - plank_gap
+                        px1 = tx1 + p * pw
+                        px2 = tx1 + (p + 1) * pw - plank_gap
                         planks.append((px1, px2))
                 else:
-                    px1 = valid_tx1
-                    px2 = valid_tx1 + pw / 2 - plank_gap
+                    px1 = tx1
+                    px2 = tx1 + pw / 2 - plank_gap
                     planks.append((px1, px2))
                     for p in range(num_main_planks - 1):
-                        px1 = valid_tx1 + pw / 2 + p * pw
-                        px2 = valid_tx1 + pw / 2 + (p + 1) * pw - plank_gap
+                        px1 = tx1 + pw / 2 + p * pw
+                        px2 = tx1 + pw / 2 + (p + 1) * pw - plank_gap
                         planks.append((px1, px2))
-                    px1 = valid_tx1 + pw / 2 + (num_main_planks - 1) * pw
-                    px2 = valid_tx2 - plank_gap
+                    px1 = tx1 + pw / 2 + (num_main_planks - 1) * pw
+                    px2 = tx2 - plank_gap
                     planks.append((px1, px2))
                 
                 for px1, px2 in planks:
                     if px2 <= px1: continue
                     
-                    v1 = bm.verts.new((px1, valid_ty1, ft - 0.2))
-                    v2 = bm.verts.new((px2, valid_ty1, ft - 0.2))
-                    v3 = bm.verts.new((px2, valid_ty2, ft - 0.2))
-                    v4 = bm.verts.new((px1, valid_ty2, ft - 0.2))
-                    f_tile = bm.faces.new((v1, v2, v3, v4))
+                    p1_b = max(min(px1, w2_start), -w2_start)
+                    p2_b = max(min(px2, w2_start), -w2_start)
+                    p1_f = max(min(px1, w2_end), -w2_end)
+                    p2_f = max(min(px2, w2_end), -w2_end)
                     
+                    back_valid = (p2_b - p1_b >= 0.01)
+                    front_valid = (p2_f - p1_f >= 0.01)
+                    
+                    if not back_valid and not front_valid:
+                        continue
+                        
+                    if back_valid and front_valid:
+                        v1 = bm.verts.new((p1_b, valid_ty1, ft - 0.2))
+                        v2 = bm.verts.new((p2_b, valid_ty1, ft - 0.2))
+                        v3 = bm.verts.new((p2_f, valid_ty2, ft - 0.2))
+                        v4 = bm.verts.new((p1_f, valid_ty2, ft - 0.2))
+                        f_tile = bm.faces.new((v1, v2, v3, v4))
+                    elif back_valid and not front_valid:
+                        v1 = bm.verts.new((p1_b, valid_ty1, ft - 0.2))
+                        v2 = bm.verts.new((p2_b, valid_ty1, ft - 0.2))
+                        v3 = bm.verts.new((p1_f, valid_ty2, ft - 0.2))
+                        f_tile = bm.faces.new((v1, v2, v3))
+                    elif not back_valid and front_valid:
+                        v1 = bm.verts.new((p1_b, valid_ty1, ft - 0.2))
+                        v2 = bm.verts.new((p2_f, valid_ty2, ft - 0.2))
+                        v3 = bm.verts.new((p1_f, valid_ty2, ft - 0.2))
+                        f_tile = bm.faces.new((v1, v2, v3))
+                        
                     geom = bmesh.ops.extrude_face_region(bm, geom=[f_tile])
                     extruded_verts = [v for v in geom['geom'] if isinstance(v, bmesh.types.BMVert)]
                     bmesh.ops.translate(bm, vec=(0, 0, tile_height + 0.2), verts=extruded_verts)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
 
     deck_obj_name = obj.name + "_Deck"
     deck_obj = bpy.data.objects.get(deck_obj_name)
@@ -471,12 +693,18 @@ def rebuild_ship_mesh(obj):
         
         deck_z = h - 2.0
         deck_thickness = 2.0
-        deck_w2 = (top_w2 - t) - tol
+        deck_offset = getattr(props, 'deck_width_offset', 0.0)
+        
+        # Match deck shape perfectly to hull inner wall
+        deck_w2_bot = get_inner_x_at_z(deck_z) - tol + deck_offset
+        deck_w2_top = get_inner_x_at_z(deck_z + deck_thickness) - tol + deck_offset
         
         deck_start_y = -l2
         deck_end_y = l2
         scale_front_deck = 1.0
         scale_back_deck = 1.0
+        
+        has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
         
         if props.section_type == 'BOW':
             scale_front_deck = 0.01
@@ -484,7 +712,8 @@ def rebuild_ship_mesh(obj):
             scale_front_deck = 1.0
             scale_back_deck = 0.7
             
-        create_deck_planks(bm_deck, deck_start_y, deck_end_y, deck_w2, deck_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2)
+            
+        create_deck_planks(bm_deck, deck_start_y, deck_end_y, deck_w2_bot, deck_w2_top, deck_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2, props.has_grid)
         
         has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
         if has_castle:
@@ -502,8 +731,12 @@ def rebuild_ship_mesh(obj):
                     
             outer_lower_w2 = get_outer_x_at_z(base_h)
                 
-            lower_deck_w2 = outer_lower_w2 - props.wall_thickness - tol
-            create_deck_planks(bm_deck, deck_start_y, deck_end_y, lower_deck_w2, lower_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2)
+            lower_deck_start_y = -l2
+            lower_deck_end_y = l2
+                
+            lower_deck_w2_bot = get_inner_x_at_z(lower_z) - tol + deck_offset
+            lower_deck_w2_top = get_inner_x_at_z(lower_z + deck_thickness) - tol + deck_offset
+            create_deck_planks(bm_deck, lower_deck_start_y, lower_deck_end_y, lower_deck_w2_bot, lower_deck_w2_top, lower_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2, props.has_grid)
                     
         # Deck mesh finalization moved to the end after accessories
 
@@ -613,8 +846,9 @@ def rebuild_ship_mesh(obj):
                 
                 y_dir_stair = y_dir * (-1.0 if direction == 'OUTWARD' else 1.0)
                 
-                hole_len = s_length + 2.0
-                hole_w = s_width + 2.0
+                tol = getattr(props, 'tolerance', 0.2)
+                hole_len = s_length + (tol * 2.0)
+                hole_w = s_width + (tol * 2.0)
                 hole_h = 6.0 
                 
                 cy = y_start + (off_y * y_dir) + (s_length / 2.0 * y_dir_stair)
@@ -661,6 +895,8 @@ def rebuild_ship_mesh(obj):
             mod_deck.operation = 'DIFFERENCE'
             mod_deck.object = deck_cutter_obj
             mod_deck.solver = 'EXACT'
+            if hasattr(mod_deck, 'use_self'):
+                mod_deck.use_self = True
     else:
         if deck_cutter_obj:
             bpy.data.objects.remove(deck_cutter_obj, do_unlink=True)
@@ -1228,6 +1464,10 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
         if needs_hull_stair_cut:
             t_wall = props.wall_thickness
             for stair in props.stairs:
+                # Do not cut the castle wall if the stair is from the hold
+                if getattr(stair, 'level', 'BODEGA_MAIN') == 'BODEGA_MAIN':
+                    continue
+                    
                 off_y = getattr(stair, 'offset_y', 0.0)
                 # Only cut the wall if the stair actually touches/intersects the wall
                 if abs(off_y) >= t_wall:
@@ -1237,8 +1477,9 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
                 off_x = getattr(stair, 'offset_x', 0.0)
                 rot_z = getattr(stair, 'rotation_z', 0.0)
                 
-                hole_len = t_wall + 2.0
-                hole_w = s_width + 2.0
+                tol = getattr(props, 'tolerance', 0.2)
+                hole_len = t_wall + 2.0 # Keep this to fully penetrate the wall
+                hole_w = s_width + (tol * 2.0)
                 hole_h = h - deck_z + 4.0
                 
                 if props.section_type == 'STERN':
@@ -1279,10 +1520,10 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     # 4. Connector Slots
     peg_l2 = 10.0
     slot_verts = [
-        (-2.742, -0.5, 0),
-        (-5.322, 3.5, 0),
-        (5.322, 3.5, 0),
-        (2.742, -0.5, 0)
+        (-2.6667, -0.5, 0),
+        (-5.3333, 3.5, 0),
+        (5.3333, 3.5, 0),
+        (2.6667, -0.5, 0)
     ]
     def add_continuous_slot_cutter():
         if not props.generate_connector_slot:

@@ -101,6 +101,11 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                 box.prop(props, "wall_thickness")
                 box.prop(props, "floor_thickness")
                 box.prop(props, "tolerance")
+                box.prop(props, "deck_width_offset")
+                
+                box.prop(props, "generate_deck_ledge")
+                if props.generate_deck_ledge:
+                    box.prop(props, "deck_ledge_width")
                 
                 box = layout.box()
                 box.label(text="Interiores", icon='FACESEL')
@@ -109,6 +114,8 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
             else:
                 box = layout.box()
                 box.label(text="Configuración del Clip", icon='MODIFIER')
+                box.prop(props, "clip_tightness")
+                box.prop(props, "clip_length_offset")
                 box.prop(props, "tolerance")
 
 class OBJECT_OT_generate_ship_section(bpy.types.Operator):
@@ -158,11 +165,33 @@ class OBJECT_OT_add_ship_stair(bpy.types.Operator):
     bl_label = "Añadir Escalera"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def invoke(self, context, event):
+        self.use_shift = event.shift
+        return self.execute(context)
+
     def execute(self, context):
         obj = context.active_object
         if obj and hasattr(obj, 'ship_generator'):
             props = obj.ship_generator
-            props.stairs.add()
+            
+            # Record source stair if shift is held
+            source_stair = None
+            if getattr(self, 'use_shift', False) and len(props.stairs) > 0:
+                idx = props.active_stair_idx
+                if 0 <= idx < len(props.stairs):
+                    source_stair = props.stairs[idx]
+            
+            new_stair = props.stairs.add()
+            
+            # Copy properties
+            if source_stair:
+                for key in source_stair.bl_rna.properties.keys():
+                    if key not in ('rna_type', 'name'):
+                        try:
+                            setattr(new_stair, key, getattr(source_stair, key))
+                        except Exception:
+                            pass
+                            
             props.active_stair_idx = len(props.stairs) - 1
             from .ship_generator import rebuild_ship_mesh
             rebuild_ship_mesh(obj)
