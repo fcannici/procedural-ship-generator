@@ -8,12 +8,9 @@ Este addon para Blender 3.0+ permite generar barcos modulares paramétricos idea
 - **Paramétrico en Tiempo Real:** Modifique el largo, el ancho, la altura de las paredes y el grosor del suelo con retroalimentación visual instantánea.
 - **Sincronización Inteligente (Smart Sync):** Al cambiar las proporciones de una pieza, todo el barco se ajusta y realinea automáticamente para mantenerse en perfecta armonía sin colisiones.
 - **Cuadrícula Integrada:** Genera automáticamente una cuadrícula esculpida (1 pulgada / 25.4mm) en el suelo para miniaturas.
-- **Escaleras Modulares:** Añada y posicione múltiples escaleras interiores, con soporte para clonación rápida (Shift+Clic) y auto-orientación inteligente.
 - **Arquitectura Multinivel (Castillos):** Eleve la cubierta de la Proa o la Popa para crear castillos de mando con escaleras integradas, listas para imprimir.
-- **Accesorios Modulares:** Enganche mástiles, timones y baupreses a la cubierta, o extráigalos como modelos independientes para imprimirlos aparte y ensamblarlos después.
-- **Escala por Raza Creadora:** Escala las alturas de las paredes y proporciones arquitectónicas automáticamente para medianos, humanos, gigantes o titanes (sin desfasar la cuadrícula táctica).
 - **Clips de Unión (Dovetail):** Incluye canales pre-cortados y un generador de clips de unión con tolerancias ajustables para ensamblar las piezas firmemente.
-- **Cubiertas Removibles con Tolerancia Ajustable:** Genera las tapas de la cubierta principal con opciones de ensanchado (offset) milimétrico para el encastre perfecto del PLA/PETG.
+- **Cubiertas Superiores Removibles:** Genera las tapas de la cubierta principal que encastran en el casco.
 
 ## Instalación
 
@@ -38,24 +35,12 @@ Este addon para Blender 3.0+ permite generar barcos modulares paramétricos idea
 2. En la sección **"Arquitectura Multinivel"**, active **"Castillo de Popa"**.
 3. Verá cómo la cubierta trasera se eleva y aparecen escaleras frontales. Puede ajustar la "Elevación" en milímetros a su gusto.
 
-### 4. Configurar Escaleras Interiores
-1. Seleccione una sección (ej. Centro) y haga clic en **"Añadir Escalera"**.
-2. Ajuste el largo, ancho, nivel y orientación (Offset X/Y) para colocarla donde desee. El agujero en el piso se tallará automáticamente.
-3. Puede elegir el nivel ("Bodega a Principal" o "Principal a Castillo") y la orientación ("Hacia Adentro" o "Hacia Afuera") de forma independiente.
-4. **Tip Rápido:** Si desea agregar otra escalera igual, haga **Shift + Clic** en "Añadir Escalera". Esto clonará instantáneamente todos los parámetros de la escalera activa actual.
+### 4. Generar Clips de Unión
+1. Cuando esté listo para imprimir, haga clic en el botón **"Generar Clip de Unión"**.
+2. Esto creará un clip "Dovetail" en el centro de la escena.
+3. Puede ajustar la "Tolerancia FDM" en el panel para hacer el encastre más apretado o más suelto según la precisión de su impresora 3D.
 
-### 5. Accesorios Modulares
-1. Seleccione la sección deseada (ej. Popa).
-2. Vaya a la sección **"Accesorios Modulares"** y pulse **"Añadir Accesorio"**.
-3. Elija el tipo (Timón, Mástil Mayor, Bauprés, etc.) y ajústelo sobre la cubierta. Se generará automáticamente un agujero de encastre (snap joint) en el barco.
-4. Para imprimir el accesorio de forma independiente, pulse **"Extraer Modelo Base (Independiente)"**. Se creará un nuevo objeto suelto listo para exportar.
-
-### 6. Configurar Tolerancias FDM y Clips de Unión
-1. Cuando esté listo para imprimir, genere el clip haciendo clic en **"Generar Clip de Unión"**.
-2. En la sección **"Impresión FDM"**, puede ajustar la **"Tolerancia FDM (mm)"** (afecta la holgura general de los clips).
-3. Si los pisos de la cubierta superior (los que se remueven) quedan muy sueltos o muy apretados al imprimir, use el parámetro **"Compensación Ancho Cubierta (mm)"**. Valores positivos (ej. 1.5) ensancharán la madera, valores negativos la encogerán, logrando un *click* perfecto según la contracción de su filamento.
-
-### 7. Impresión 3D
+### 5. Impresión 3D
 - Seleccione cada parte por separado (Centro, Popa, Proa, Clip, Tapas) y expórtelas como archivos `.STL` (`File` > `Export` > `Stl`).
 - El modelo está diseñado para imprimirse sin soportes en la mayoría de sus partes (los canales de los clips están orientados horizontalmente y pueden requerir puentes cortos).
 

@@ -20,6 +20,7 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                 
                 box = layout.box()
                 box.label(text="Dimensiones Base", icon='OBJECT_DATA')
+                box.prop(props, "creator_race")
                 box.prop(props, "section_type")
                 box.prop(props, "tiles_length")
                 box.prop(props, "tiles_width")
@@ -62,15 +63,54 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                         box.prop(props, "active_stair_idx", text=f"Escalera ({len(props.stairs)})")
                         idx = props.active_stair_idx
                         if 0 <= idx < len(props.stairs):
-                            st = props.stairs[idx]
-                            sbox = box.box()
-                            sbox.prop(st, "level")
-                            sbox.prop(st, "direction")
-                            sbox.prop(st, "offset_x")
-                            sbox.prop(st, "offset_y")
-                            sbox.prop(st, "rotation_z")
-                            sbox.prop(st, "width")
-                            sbox.prop(st, "length")
+                            stair = props.stairs[idx]
+                            col = box.column(align=True)
+                            col.prop(stair, "level")
+                            col.label(text=f"DEBUG VAL: {stair.level}")
+                            
+                            box.separator()
+                            box.label(text="--- DEBUG ALL STAIRS ---")
+                            for i, s in enumerate(props.stairs):
+                                box.label(text=f"S{i}: level={s.level}, dir={s.direction}")
+                            box.label(text="-----------------------")
+                            
+                            col.prop(stair, "direction")
+                            col.separator()
+                            col.prop(stair, "offset_x")
+                            col.prop(stair, "offset_y")
+                            col.separator()
+                            col.prop(stair, "width")
+                            col.prop(stair, "length")
+                
+                # Accesorios Modulares
+                box = layout.box()
+                box.label(text="Accesorios Modulares", icon='MODIFIER')
+                
+                row = box.row()
+                row.operator("object.add_ship_accessory", text="Añadir Accesorio", icon='ADD')
+                if len(props.accessories) > 0:
+                    row.operator("object.remove_ship_accessory", text="", icon='REMOVE')
+                    
+                    box.prop(props, "active_accessory_idx", text=f"Accesorio ({len(props.accessories)})")
+                    
+                    idx = props.active_accessory_idx
+                    if 0 <= idx < len(props.accessories):
+                        acc = props.accessories[idx]
+                        col = box.column(align=True)
+                        col.prop(acc, "acc_type")
+                        col.prop(acc, "level")
+                        
+                        col.separator()
+                        col.prop(acc, "offset_x")
+                        col.prop(acc, "offset_y")
+                        col.prop(acc, "rotation_z")
+                        
+                        col.separator()
+                        col.prop(acc, "snap_radius")
+                        col.prop(acc, "snap_depth")
+                        
+                        col.separator()
+                        col.operator("object.generate_accessory_mesh", icon='MESH_DATA')
                     
                 if props.has_quarterdeck or props.has_forecastle:
                     box.prop(props, "deck_elevation")
@@ -214,6 +254,75 @@ class OBJECT_OT_remove_ship_stair(bpy.types.Operator):
                 rebuild_ship_mesh(obj)
         return {'FINISHED'}
 
+class OBJECT_OT_add_ship_accessory(bpy.types.Operator):
+    bl_idname = "object.add_ship_accessory"
+    bl_label = "Añadir Accesorio"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def invoke(self, context, event):
+        self.use_shift = event.shift
+        return self.execute(context)
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and hasattr(obj, 'ship_generator'):
+            props = obj.ship_generator
+            
+            source_acc = None
+            if getattr(self, 'use_shift', False) and len(props.accessories) > 0:
+                idx = props.active_accessory_idx
+                if 0 <= idx < len(props.accessories):
+                    source_acc = props.accessories[idx]
+            
+            new_acc = props.accessories.add()
+            
+            if source_acc:
+                for key in source_acc.bl_rna.properties.keys():
+                    if key not in ('rna_type', 'name'):
+                        try:
+                            setattr(new_acc, key, getattr(source_acc, key))
+                        except Exception:
+                            pass
+                            
+            props.active_accessory_idx = len(props.accessories) - 1
+            from .ship_generator import rebuild_ship_mesh
+            rebuild_ship_mesh(obj)
+        return {'FINISHED'}
+
+class OBJECT_OT_remove_ship_accessory(bpy.types.Operator):
+    bl_idname = "object.remove_ship_accessory"
+    bl_label = "Eliminar Accesorio"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and hasattr(obj, 'ship_generator'):
+            props = obj.ship_generator
+            idx = props.active_accessory_idx
+            if 0 <= idx < len(props.accessories):
+                props.accessories.remove(idx)
+                props.active_accessory_idx = max(0, idx - 1)
+                from .ship_generator import rebuild_ship_mesh
+                rebuild_ship_mesh(obj)
+        return {'FINISHED'}
+
+class OBJECT_OT_generate_accessory_mesh(bpy.types.Operator):
+    bl_idname = "object.generate_accessory_mesh"
+    bl_label = "Extraer Modelo Base (Independiente)"
+    bl_description = "Genera un modelo base separado para esculpir/imprimir"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and hasattr(obj, 'ship_generator'):
+            props = obj.ship_generator
+            idx = props.active_accessory_idx
+            if 0 <= idx < len(props.accessories):
+                acc = props.accessories[idx]
+                from .ship_generator import generate_standalone_accessory
+                generate_standalone_accessory(acc, obj)
+        return {'FINISHED'}
+
 class OBJECT_OT_generate_full_ship(bpy.types.Operator):
     bl_idname = "object.generate_full_ship"
     bl_label = "Generar Barco Inicial (3 Partes)"
@@ -288,6 +397,9 @@ classes = [
     OBJECT_OT_generate_ship_section,
     OBJECT_OT_add_ship_stair,
     OBJECT_OT_remove_ship_stair,
+    OBJECT_OT_add_ship_accessory,
+    OBJECT_OT_remove_ship_accessory,
+    OBJECT_OT_generate_accessory_mesh,
     OBJECT_OT_generate_full_ship,
     OBJECT_OT_generate_connector_clip
 ]

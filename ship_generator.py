@@ -245,6 +245,96 @@ def build_hull(bm, props):
     """
     pass
 
+def generate_standalone_accessory(acc, ship_obj):
+    import bpy
+    import bmesh
+    import math
+    import mathutils
+    
+    props = ship_obj.ship_generator
+    tol = props.tolerance
+    
+    mesh_name = f"Acc_{acc.acc_type}"
+    mesh = bpy.data.meshes.new(mesh_name)
+    obj = bpy.data.objects.new(mesh_name, mesh)
+    bpy.context.collection.objects.link(obj)
+    
+    race_scale = 1.0
+    if hasattr(props, 'creator_race'):
+        if props.creator_race == 'HALFLING': race_scale = 0.75
+        elif props.creator_race == 'GIANT': race_scale = 1.5
+        elif props.creator_race == 'TITAN': race_scale = 2.0
+        
+    # Calculate target position based on ship
+    h = props.wall_height * race_scale
+    ft = props.floor_thickness
+    
+    if acc.level == 'MAIN':
+        acc_z = h
+    elif acc.level == 'CASTLE':
+        has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+        acc_z = h + (props.deck_elevation * race_scale) if has_castle else h
+    else: # BODEGA
+        acc_z = ft
+        
+    obj.location = (
+        ship_obj.location.x + acc.offset_x,
+        ship_obj.location.y + acc.offset_y,
+        ship_obj.location.z + acc_z
+    )
+    
+    bm = bmesh.new()
+    
+    pin_radius = max(0.5, acc.snap_radius - tol)
+    pin_depth = acc.snap_depth
+    
+    ret = bmesh.ops.create_cone(
+        bm, cap_ends=True, cap_tris=False, segments=16,
+        radius1=pin_radius, radius2=pin_radius, depth=pin_depth
+    )
+    bmesh.ops.translate(bm, vec=(0, 0, -pin_depth/2.0), verts=ret['verts'])
+    
+    # Store vertices for the visual part of the accessory so we can scale them without scaling the peg
+    start_idx = len(bm.verts)
+    
+    if acc.acc_type == 'HELM':
+        base = bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=4.0, radius2=3.0, depth=10.0)
+        bmesh.ops.translate(bm, vec=(0, 0, 5.0), verts=base['verts'])
+        
+        wheel = bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=6.0, radius2=6.0, depth=1.5)
+        rmat_x = mathutils.Matrix.Rotation(math.pi/2.0, 4, 'X')
+        bmesh.ops.transform(bm, matrix=rmat_x, verts=wheel['verts'])
+        bmesh.ops.translate(bm, vec=(0, 3.0, 10.0), verts=wheel['verts'])
+        
+    elif acc.acc_type.startswith('MAST') or acc.acc_type == 'BOWSPRIT':
+        mast = bmesh.ops.create_cone(bm, cap_ends=True, segments=16, radius1=pin_radius, radius2=pin_radius*0.5, depth=150.0)
+        
+        if acc.acc_type == 'BOWSPRIT':
+            rmat_x = mathutils.Matrix.Rotation(math.radians(-30), 4, 'X')
+            bmesh.ops.transform(bm, matrix=rmat_x, verts=mast['verts'])
+            bmesh.ops.translate(bm, vec=(0, 75.0, 37.5), verts=mast['verts'])
+        else:
+            bmesh.ops.translate(bm, vec=(0, 0, 75.0), verts=mast['verts'])
+            
+    # Apply race scale to the visual accessory geometry (skip the peg which is before start_idx)
+    if race_scale != 1.0:
+        visual_verts = bm.verts[start_idx:]
+        if len(visual_verts) > 0:
+            scale_mat = mathutils.Matrix.Scale(race_scale, 4)
+            bmesh.ops.transform(bm, matrix=scale_mat, verts=visual_verts)
+            
+    # Apply user rotation
+    rot_mat = mathutils.Matrix.Rotation(math.radians(acc.rotation_z), 4, 'Z')
+    bmesh.ops.transform(bm, matrix=rot_mat, verts=bm.verts)
+    
+    bm.to_mesh(mesh)
+    bm.free()
+    
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
 def rebuild_ship_mesh(obj):
     print("START REBUILD")
     if not obj or obj.type != 'MESH':
@@ -284,17 +374,23 @@ def rebuild_ship_mesh(obj):
         bm.free()
         return
 
+    race_scale = 1.0
+    if hasattr(props, 'creator_race'):
+        if props.creator_race == 'HALFLING': race_scale = 0.75
+        elif props.creator_race == 'GIANT': race_scale = 1.5
+        elif props.creator_race == 'TITAN': race_scale = 2.0
+        
     grid_size = 25.4
     l2 = (props.tiles_length * grid_size) / 2.0
-    base_h = props.wall_height
+    base_h = props.wall_height * race_scale
     h = base_h
     t = props.wall_thickness
     ft = props.floor_thickness
     
     if props.section_type == 'STERN' and props.has_quarterdeck:
-        h += props.deck_elevation
+        h += (props.deck_elevation * race_scale)
     elif props.section_type == 'BOW' and props.has_forecastle:
-        h += props.deck_elevation
+        h += (props.deck_elevation * race_scale)
     
     bot_w2 = (props.tiles_width * grid_size) / 2.0 + t
     w2 = bot_w2 * 2.0
@@ -372,29 +468,40 @@ def rebuild_ship_mesh(obj):
     
     raw_zs = [p[1] for p in reversed(outer_right_profile) if p[1] > ft]
     
-    if has_ledge and deck_z > ft + ledge_w:
-        final_zs = []
-        for z in raw_zs:
-            if z > deck_z:
-                final_zs.append((z, get_inner_x_at_z(z)))
-            elif z < deck_z - ledge_w:
-                final_zs.append((z, get_inner_x_at_z(z)))
-                
-        insert_idx = 0
-        for i, (z, x) in enumerate(final_zs):
-            if z < deck_z:
-                insert_idx = i
-                break
-        else:
-            insert_idx = len(final_zs)
+    if has_ledge:
+        def add_ledge(target_z, current_zs):
+            new_zs = []
+            for z, x in current_zs:
+                if z > target_z or z < target_z - ledge_w:
+                    new_zs.append((z, x))
             
-        ledge_points = [
-            (deck_z, get_inner_x_at_z(deck_z)),
-            (deck_z, get_inner_x_at_z(deck_z) - ledge_w),
-            (deck_z - ledge_w, get_inner_x_at_z(deck_z - ledge_w))
-        ]
+            insert_idx = 0
+            for i, (z, x) in enumerate(new_zs):
+                if z < target_z:
+                    insert_idx = i
+                    break
+            else:
+                insert_idx = len(new_zs)
+                
+            ledge_points = [
+                (target_z, get_inner_x_at_z(target_z)),
+                (target_z, get_inner_x_at_z(target_z) - ledge_w),
+                (target_z - ledge_w, get_inner_x_at_z(target_z - ledge_w))
+            ]
+            
+            return new_zs[:insert_idx] + ledge_points + new_zs[insert_idx:]
+
+        final_zs = [(z, get_inner_x_at_z(z)) for z in raw_zs]
         
-        final_zs = final_zs[:insert_idx] + ledge_points + final_zs[insert_idx:]
+        # Upper deck ledge
+        if deck_z > ft + ledge_w:
+            final_zs = add_ledge(deck_z, final_zs)
+            
+        # Lower deck ledge (for castles)
+        has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+        lower_z = base_h - 2.0
+        if has_castle and lower_z > ft + ledge_w:
+            final_zs = add_ledge(lower_z, final_zs)
         
         for z, x in final_zs:
             inner_right.append((x, z, 0))
@@ -817,6 +924,9 @@ def rebuild_ship_mesh(obj):
             needs_deck_cuts = True
         if getattr(props, 'has_trapdoor', False) or getattr(props, 'has_mast', False):
             needs_deck_cuts = True
+        for acc in props.accessories:
+            if acc.level in ('MAIN', 'CASTLE'):
+                needs_deck_cuts = True
 
     if needs_deck_cuts:
         if not deck_cutter_obj:
@@ -838,8 +948,8 @@ def rebuild_ship_mesh(obj):
                 level = getattr(stair, 'level', 'BODEGA_MAIN')
                 direction = getattr(stair, 'direction', 'INWARD')
                 
-                s_width = getattr(stair, 'width', 20.0)
-                s_length = getattr(stair, 'length', 40.0)
+                s_width = getattr(stair, 'width', 20.0) * race_scale
+                s_length = getattr(stair, 'length', 40.0) * race_scale
                 off_x = getattr(stair, 'offset_x', 0.0)
                 off_y = getattr(stair, 'offset_y', 0.0)
                 rot_z = getattr(stair, 'rotation_z', 0.0)
@@ -883,6 +993,14 @@ def rebuild_ship_mesh(obj):
             cut_h = sock_h + 4.0
             ret = bmesh.ops.create_cone(bm_deck_cutter, cap_ends=True, cap_tris=False, segments=32, radius1=sock_d/2.0, radius2=sock_d/2.0, depth=cut_h)
             bmesh.ops.translate(bm_deck_cutter, vec=(0, y_off, deck_z), verts=ret['verts'])
+        
+        for acc in props.accessories:
+            if acc.level in ('MAIN', 'CASTLE'):
+                acc_z = h
+                
+                cut_h = acc.snap_depth + 4.0 # Add extra depth to ensure clean boolean cut
+                ret = bmesh.ops.create_cone(bm_deck_cutter, cap_ends=True, cap_tris=False, segments=16, radius1=acc.snap_radius, radius2=acc.snap_radius, depth=cut_h)
+                bmesh.ops.translate(bm_deck_cutter, vec=(acc.offset_x, acc.offset_y, acc_z - acc.snap_depth/2.0), verts=ret['verts'])
         
         bm_deck_cutter.to_mesh(deck_cutter_obj.data)
         bm_deck_cutter.free()
@@ -934,10 +1052,10 @@ def rebuild_ship_mesh(obj):
                 level = getattr(stair, 'level', 'BODEGA_MAIN')
                 direction = getattr(stair, 'direction', 'INWARD')
                 
-                s_width = getattr(stair, 'width', 20.0)
+                s_width = getattr(stair, 'width', 20.0) * race_scale
                 stair_w2 = s_width / 2.0
                 
-                s_length = getattr(stair, 'length', 40.0)
+                s_length = getattr(stair, 'length', 40.0) * race_scale
                 
                 off_x = getattr(stair, 'offset_x', 0.0)
                 off_y = getattr(stair, 'offset_y', 0.0)
@@ -974,8 +1092,11 @@ def rebuild_ship_mesh(obj):
                     num_steps = int(math.ceil(elev_lower / step_height))
                     step_depth = s_length / float(num_steps)
                     
+                    pts = []
+                    y_front = num_steps * step_depth * y_dir_stair - (s_length / 2.0 * y_dir_stair)
+                    pts.append((y_front, z_start))
+                    
                     for i in range(num_steps):
-                        z0 = z_start + i * step_height
                         z1 = z_start + (i + 1) * step_height
                         if i == num_steps - 1:
                             z1 = target_z # Ensure exact match on last step
@@ -984,26 +1105,27 @@ def rebuild_ship_mesh(obj):
                         y0_loc = dist * step_depth * y_dir_stair - (s_length / 2.0 * y_dir_stair)
                         y1_loc = (dist + 1) * step_depth * y_dir_stair - (s_length / 2.0 * y_dir_stair)
                         
-                        x0_loc = -stair_w2
-                        x1_loc = stair_w2
+                        pts.append((y1_loc, z1))
+                        pts.append((y0_loc, z1))
                         
-                        sv = [
-                            bm_final.verts.new(xform(x0_loc, y0_loc, z0)),
-                            bm_final.verts.new(xform(x1_loc, y0_loc, z0)),
-                            bm_final.verts.new(xform(x1_loc, y0_loc, z1)),
-                            bm_final.verts.new(xform(x0_loc, y0_loc, z1)),
-                            bm_final.verts.new(xform(x0_loc, y1_loc, z0)),
-                            bm_final.verts.new(xform(x1_loc, y1_loc, z0)),
-                            bm_final.verts.new(xform(x1_loc, y1_loc, z1)),
-                            bm_final.verts.new(xform(x0_loc, y1_loc, z1))
-                        ]
+                    pts.append((pts[-1][0], z_start))
+                    
+                    verts_left = [bm_final.verts.new(xform(-stair_w2, p[0], p[1])) for p in pts]
+                    verts_right = [bm_final.verts.new(xform(stair_w2, p[0], p[1])) for p in pts]
+                    
+                    if y_dir_stair > 0:
+                        bm_final.faces.new(tuple(reversed(verts_left)))
+                        bm_final.faces.new(verts_right)
+                    else:
+                        bm_final.faces.new(verts_left)
+                        bm_final.faces.new(tuple(reversed(verts_right)))
                         
-                        bm_final.faces.new((sv[0], sv[3], sv[2], sv[1]))
-                        bm_final.faces.new((sv[4], sv[5], sv[6], sv[7]))
-                        bm_final.faces.new((sv[0], sv[1], sv[5], sv[4]))
-                        bm_final.faces.new((sv[3], sv[7], sv[6], sv[2]))
-                        bm_final.faces.new((sv[0], sv[4], sv[7], sv[3]))
-                        bm_final.faces.new((sv[1], sv[2], sv[6], sv[5]))
+                    for i in range(len(pts)):
+                        i_next = (i + 1) % len(pts)
+                        if y_dir_stair > 0:
+                            bm_final.faces.new((verts_left[i], verts_left[i_next], verts_right[i_next], verts_right[i]))
+                        else:
+                            bm_final.faces.new((verts_left[i], verts_right[i], verts_right[i_next], verts_left[i_next]))
 
 
 
@@ -1119,9 +1241,11 @@ def rebuild_ship_mesh(obj):
                 
         if getattr(props, 'has_mast', False):
             sock_h = getattr(props, 'mast_socket_height', 15.0)
-            sock_d = getattr(props, 'mast_diameter', 8.0) + 6.0
+            sock_d = getattr(props, 'mast_diameter', 8.0)
             y_off = getattr(props, 'mast_y_offset', 0.0)
-            ret = bmesh.ops.create_cone(bm_final, cap_ends=True, cap_tris=False, segments=32, radius1=sock_d/2.0, radius2=sock_d/2.0, depth=sock_h)
+            
+            cut_h = sock_h + 2.0
+            ret = bmesh.ops.create_cone(bm_final, cap_ends=True, cap_tris=False, segments=32, radius1=sock_d/2.0-0.5, radius2=sock_d/2.0-0.5, depth=cut_h)
             bmesh.ops.translate(bm_final, vec=(0, y_off, mast_td_z + sock_h/2.0), verts=ret['verts'])
             
         bm_final.normal_update()
@@ -1131,6 +1255,26 @@ def rebuild_ship_mesh(obj):
     else:
         if rail_obj:
             bpy.data.objects.remove(rail_obj, do_unlink=True)
+            
+    # Live-sync already extracted standalone accessory models
+    for idx, acc in enumerate(props.accessories):
+        acc_name = f"{obj.name}_Acc_{idx}_{acc.acc_type}"
+        acc_obj = bpy.data.objects.get(acc_name)
+        if acc_obj:
+            if acc.level == 'MAIN':
+                acc_z = base_h
+            elif acc.level == 'CASTLE':
+                has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+                acc_z = base_h + (props.deck_elevation * race_scale) if has_castle else base_h
+            else: # BODEGA
+                acc_z = ft
+                
+            acc_obj.location = (
+                obj.location.x + acc.offset_x,
+                obj.location.y + acc.offset_y,
+                obj.location.z + acc_z
+            )
+            acc_obj.rotation_euler = (0, 0, math.radians(acc.rotation_z))
 
 def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     def apply_modifier_safely(target_obj, mod_name):
@@ -1172,7 +1316,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
 
     
 
-    if not gen_wall and not gen_floor and not has_mast and not has_trapdoor:
+    if not gen_wall and not gen_floor and not has_mast and not has_trapdoor and len(props.accessories) == 0:
         pass # We no longer return early because we ALWAYS need to generate connector slots!
 
         
@@ -1444,6 +1588,13 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
         center_z = (mast_td_z - 2.0) + (cut_h / 2.0)
         bmesh.ops.translate(bm, vec=(0, y_off, center_z), verts=ret['verts'])
 
+    for acc in props.accessories:
+        if acc.level == 'BODEGA' or (acc.level in ('MAIN', 'CASTLE') and not props.generate_top_deck):
+            cut_h = acc.snap_depth + 4.0
+            ret = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=16, radius1=acc.snap_radius, radius2=acc.snap_radius, depth=cut_h)
+            center_z = ft - (cut_h / 2.0) + 2.0 # Ensure it starts at floor and goes down
+            bmesh.ops.translate(bm, vec=(acc.offset_x, acc.offset_y, center_z), verts=ret['verts'])
+
     if getattr(props, 'has_trapdoor', False) and not props.generate_top_deck:
         td_size = getattr(props, 'trapdoor_size', 1.0) * 25.4 # Convert squares to mm
         y_off = getattr(props, 'trapdoor_y_offset', 0.0)
@@ -1473,14 +1624,14 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
                 if abs(off_y) >= t_wall:
                     continue
                 
-                s_width = getattr(stair, 'width', 20.0)
+                s_width = getattr(stair, 'width', 20.0) * race_scale
                 off_x = getattr(stair, 'offset_x', 0.0)
                 rot_z = getattr(stair, 'rotation_z', 0.0)
                 
                 tol = getattr(props, 'tolerance', 0.2)
                 hole_len = t_wall + 2.0 # Keep this to fully penetrate the wall
                 hole_w = s_width + (tol * 2.0)
-                hole_h = h - deck_z + 4.0
+                hole_h = h - base_h + 4.0
                 
                 if props.section_type == 'STERN':
                     cy = l2 - t_wall / 2.0
@@ -1488,7 +1639,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
                     cy = -l2 + t_wall / 2.0
                     
                 cx = off_x
-                cz = deck_z + (h - deck_z) / 2.0
+                cz = base_h + (h - base_h) / 2.0
                 
                 ret = bmesh.ops.create_cube(bm, size=1.0)
                 bmesh.ops.scale(bm, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])

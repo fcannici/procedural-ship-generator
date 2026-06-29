@@ -7,8 +7,8 @@ def _realign_ship(context):
     mids = []
     sterns = []
     
-    for o in list(context.view_layer.objects):
-        if o and o.type == 'MESH' and hasattr(o, 'ship_generator') and o.ship_generator.is_ship:
+    for o in context.view_layer.objects:
+        if o.type == 'MESH' and hasattr(o, 'ship_generator') and o.ship_generator.is_ship:
             t = o.ship_generator.section_type
             if t == 'BOW': bows.append(o)
             elif t == 'MID': mids.append(o)
@@ -51,29 +51,8 @@ def update_no_sync(self, context):
     from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
     if obj and obj.type == 'MESH':
-        try:
-            rebuild_ship_mesh(obj)
-        except Exception as e:
-            print("Error triggering update:", e)
-
-def update_accessory_no_sync(self, context):
-    from .ship_generator import rebuild_ship_mesh
-    obj = self.id_data
-    if obj and obj.type == 'MESH':
-        try:
-            rebuild_ship_mesh(obj)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            def draw(self, context):
-                self.layout.label(text=f"Error al generar: {str(e)}")
-            context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
+        rebuild_ship_mesh(obj)
     _realign_ship(context)
-
-def update_stair_level(self, context):
-    if self.level == 'MAIN_CASTLE':
-        self.direction = 'OUTWARD'
-    update_no_sync(self, context)
 
 def _sync_prop(self, context, prop_name):
     global _updating_all
@@ -84,40 +63,23 @@ def _sync_prop(self, context, prop_name):
         _updating_all = True
         try:
             val = getattr(self, prop_name)
-            for other in list(context.view_layer.objects):
-                if other and other != obj and other.type == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
+            for other in context.view_layer.objects:
+                if other != obj and other.type == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
                     setattr(other.ship_generator, prop_name, val)
-                    try:
-                        rebuild_ship_mesh(other)
-                    except Exception as e:
-                        import traceback
-                        traceback.print_exc()
-                        def draw(self, context):
-                            self.layout.label(text=f"Error (Sincronizado): {str(e)}")
-                        context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
+                    rebuild_ship_mesh(other)
         finally:
             _updating_all = False
             
     if obj and obj.type == 'MESH':
-        try:
-            rebuild_ship_mesh(obj)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            def draw(self, context):
-                self.layout.label(text=f"Error al generar: {str(e)}")
-            context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
+        rebuild_ship_mesh(obj)
     _realign_ship(context)
 
 def update_tiles_width(self, context): _sync_prop(self, context, 'tiles_width')
 def update_wall_height(self, context): _sync_prop(self, context, 'wall_height')
 def update_wall_thickness(self, context): _sync_prop(self, context, 'wall_thickness')
 def update_floor_thickness(self, context): _sync_prop(self, context, 'floor_thickness')
-def update_deck_width_offset(self, context): _sync_prop(self, context, 'deck_width_offset')
 def update_has_grid(self, context): _sync_prop(self, context, 'has_grid')
 def update_tolerance(self, context): _sync_prop(self, context, 'tolerance')
-def update_clip_tightness(self, context): _sync_prop(self, context, 'clip_tightness')
-def update_clip_length_offset(self, context): _sync_prop(self, context, 'clip_length_offset')
 def update_plank_height(self, context): _sync_prop(self, context, 'plank_height')
 def update_lapstrake_depth(self, context): _sync_prop(self, context, 'lapstrake_depth')
 def update_generate_plank_cuts(self, context): _sync_prop(self, context, 'generate_plank_cuts')
@@ -128,140 +90,15 @@ def update_generate_floor_planks(self, context): _sync_prop(self, context, 'gene
 def update_floor_plank_width(self, context): _sync_prop(self, context, 'floor_plank_width')
 def update_floor_plank_length(self, context): _sync_prop(self, context, 'floor_plank_length')
 
-def update_generate_connector_slot(self, context): _sync_prop(self, context, 'generate_connector_slot')
-
-class StairItem(bpy.types.PropertyGroup):
-    level: bpy.props.EnumProperty(
-        name="Nivel",
-        description="Niveles que conecta la escalera",
-        items=[
-            ('BODEGA_MAIN', "Bodega a Principal", "Conecta la bodega con la cubierta principal"),
-            ('MAIN_CASTLE', "Principal a Castillo", "Conecta la cubierta principal con el castillo (si existe)")
-        ],
-        default='BODEGA_MAIN',
-        update=update_no_sync
-    )
-    direction: bpy.props.EnumProperty(
-        name="Dirección",
-        description="Hacia dónde se extiende la escalera",
-        items=[
-            ('INWARD', "Hacia Adentro", "La escalera se construye hacia el interior del módulo"),
-            ('OUTWARD', "Hacia Afuera", "La escalera sobresale hacia el módulo adyacente")
-        ],
-        default='INWARD',
-        update=update_no_sync
-    )
-    offset_x: bpy.props.FloatProperty(
-        name="Offset X Escalera",
-        description="Mueve las escaleras lateralmente",
-        default=0.0,
-        update=update_no_sync
-    )
-    offset_y: bpy.props.FloatProperty(
-        name="Offset Y Escalera",
-        description="Mueve las escaleras longitudinalmente",
-        default=0.0,
-        update=update_no_sync
-    )
-    rotation_z: bpy.props.FloatProperty(
-        name="Rotación Z Escalera",
-        description="Rota las escaleras sobre el eje Z (en grados)",
-        default=0.0,
-        update=update_no_sync
-    )
-    width: bpy.props.FloatProperty(
-        name="Ancho Escalera",
-        description="Define el ancho de la escalera",
-        default=20.0,
-        min=5.0,
-        update=update_no_sync
-    )
-    length: bpy.props.FloatProperty(
-        name="Largo Escalera",
-        description="Define qué tan lejos llegan los escalones",
-        default=40.0,
-        min=10.0,
-        update=update_no_sync
-    )
-
-class AccessoryItem(bpy.types.PropertyGroup):
-    acc_type: bpy.props.EnumProperty(
-        name="Tipo",
-        items=[
-            ('HELM', "Timón", "Timón de mando"),
-            ('MAST_MAIN', "Mástil Mayor", "Mástil central"),
-            ('MAST_FORE', "Mástil Trinquete (Proa)", "Mástil delantero"),
-            ('MAST_MIZZEN', "Mástil Mesana (Popa)", "Mástil trasero"),
-            ('BOWSPRIT', "Bauprés", "Mástil de proa inclinado"),
-            ('CUSTOM', "Personalizado", "Punto de encastre genérico")
-        ],
-        default='HELM',
-        update=update_accessory_no_sync
-    )
-    level: bpy.props.EnumProperty(
-        name="Cubierta",
-        items=[
-            ('CASTLE', "Castillo", "Cubierta elevada (Castillo)"),
-            ('MAIN', "Principal", "Cubierta principal"),
-            ('BODEGA', "Bodega (Fondo)", "Piso de la bodega")
-        ],
-        default='CASTLE',
-        update=update_accessory_no_sync
-    )
-    offset_x: bpy.props.FloatProperty(
-        name="Offset X",
-        default=0.0,
-        update=update_accessory_no_sync
-    )
-    offset_y: bpy.props.FloatProperty(
-        name="Offset Y",
-        default=0.0,
-        update=update_accessory_no_sync
-    )
-    rotation_z: bpy.props.FloatProperty(
-        name="Rotación Z",
-        default=0.0,
-        update=update_accessory_no_sync
-    )
-    snap_radius: bpy.props.FloatProperty(
-        name="Radio de Encastre (mm)",
-        default=3.0,
-        update=update_accessory_no_sync
-    )
-    snap_depth: bpy.props.FloatProperty(
-        name="Profundidad de Encastre (mm)",
-        default=5.0,
-        update=update_accessory_no_sync
-    )
-
 class ShipGeneratorProperties(bpy.types.PropertyGroup):
-    creator_race: bpy.props.EnumProperty(
-        name="Raza Creadora",
-        description="Escala las proporciones arquitectónicas (no la cuadrícula) según la raza",
-        items=[
-            ('HALFLING', "Medianos/Gnomos (0.75x)", "Arquitectura pequeña"),
-            ('HUMAN', "Humanos/Elfos (1.0x)", "Arquitectura estándar"),
-            ('GIANT', "Gigantes/Goliaths (1.5x)", "Arquitectura grande"),
-            ('TITAN', "Titanes (2.0x)", "Arquitectura colosal")
-        ],
-        default='HUMAN',
-        update=update_no_sync
-    )
-    
     is_ship: bpy.props.BoolProperty(
         name="Es un barco procedural",
         default=False
     )
     
     is_connector_clip: bpy.props.BoolProperty(
-        name="Índice de Escalera Activa",
-        default=0
-    )
-    
-    accessories: bpy.props.CollectionProperty(type=AccessoryItem)
-    active_accessory_idx: bpy.props.IntProperty(
-        name="Índice de Accesorio Activo",
-        default=0
+        name="Es un clip de unión",
+        default=False
     )
     
     section_type: bpy.props.EnumProperty(
@@ -317,13 +154,6 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
-    quarterdeck_closed_front: bpy.props.BoolProperty(
-        name="Cerrar Castillo de Popa",
-        description="Cierra toda la pared frontal del castillo. Si está desactivado, deja un balcón abierto a la cubierta inferior.",
-        default=False,
-        update=update_no_sync
-    )
-    
     has_forecastle: bpy.props.BoolProperty(
         name="Castillo de Proa",
         description="Eleva la cubierta delantera",
@@ -331,34 +161,11 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
-    forecastle_closed_back: bpy.props.BoolProperty(
-        name="Cerrar Castillo de Proa",
-        description="Cierra toda la pared trasera del castillo. Si está desactivado, deja un balcón abierto a la cubierta inferior.",
-        default=False,
-        update=update_no_sync
-    )
-    
     deck_elevation: bpy.props.FloatProperty(
-        name="Alto de Pared del Castillo (mm)",
+        name="Elevación (mm)",
         description="Altura adicional para los castillos",
         default=25.0,
         min=10.0,
-        update=update_no_sync
-    )
-    
-    generate_deck_ledge: bpy.props.BoolProperty(
-        name="Generar Soporte para Cubierta (Cuña)",
-        description="Añade una cuña de 45 grados en el muro interior para que la cubierta descanse sin necesidad de soportes de impresión",
-        default=True,
-        update=update_no_sync
-    )
-    
-    deck_ledge_width: bpy.props.FloatProperty(
-        name="Ancho de la Cuña (mm)",
-        description="Qué tanto sobresale la cuña hacia adentro",
-        default=2.0,
-        min=0.5,
-        max=10.0,
         update=update_no_sync
     )
     
@@ -369,29 +176,12 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
-    stairs: bpy.props.CollectionProperty(type=StairItem)
-    active_stair_idx: bpy.props.IntProperty(
-        name="Escalera Activa",
-        default=0
-    )
-    
     floor_thickness: bpy.props.FloatProperty(
         name="Grosor de Suelo",
         description="Grosor sólido del piso en mm",
         default=6.0,
         min=1.0,
         update=update_floor_thickness
-    )
-    
-    deck_width_offset: bpy.props.FloatProperty(
-        name="Compensación Ancho Cubierta (mm)",
-        description="Ajuste fino para el ancho de la cubierta (positivo = más ancho, negativo = más angosto)",
-        default=0.0,
-        min=-10.0,
-        max=10.0,
-        step=10,
-        precision=2,
-        update=update_deck_width_offset
     )
     
     has_grid: bpy.props.BoolProperty(
@@ -410,34 +200,12 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
     
     tolerance: bpy.props.FloatProperty(
         name="Tolerancia FDM (mm)",
-        description="Tolerancia general para encastres",
+        description="Tolerancia para encastres",
         default=0.2,
         min=0.0,
         step=1,
         precision=2,
         update=update_tolerance
-    )
-    
-    clip_tightness: bpy.props.FloatProperty(
-        name="Ajuste de Grosor (Apriete)",
-        description="Aumentar para que el clip quede más gordo (apretado). Disminuir para más suelto.",
-        default=0.0,
-        min=-0.5,
-        max=0.5,
-        step=1,
-        precision=2,
-        update=update_clip_tightness
-    )
-    
-    clip_length_offset: bpy.props.FloatProperty(
-        name="Ajuste de Largo",
-        description="Aumentar para hacer el clip más largo (eje Y). Disminuir para más corto.",
-        default=0.0,
-        min=-2.0,
-        max=2.0,
-        step=1,
-        precision=2,
-        update=update_clip_length_offset
     )
     
     plank_height: bpy.props.FloatProperty(
@@ -485,13 +253,6 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         description="Genera textura de tablones separados en la cubierta",
         default=True,
         update=update_generate_floor_planks
-    )
-    
-    generate_connector_slot: bpy.props.BoolProperty(
-        name="Generar Canaleta (Zocalo)",
-        description="Genera la canaleta inferior para conectar las piezas",
-        default=True,
-        update=update_generate_connector_slot
     )
     
     floor_plank_width: bpy.props.FloatProperty(
@@ -564,15 +325,6 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
-    railing_offset_inward: bpy.props.FloatProperty(
-        name="Desplazamiento al Centro",
-        description="Mueve las barandas hacia el centro para evitar que sobresalgan del casco",
-        default=0.5,
-        min=0.0,
-        max=5.0,
-        update=update_no_sync
-    )
-    
     railing_spacing: bpy.props.FloatProperty(
         name="Espaciado de Postes",
         description="Distancia entre postes verticales en mm",
@@ -604,8 +356,6 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
     )
 
 classes = [
-    StairItem,
-    AccessoryItem,
     ShipGeneratorProperties
 ]
 
@@ -616,3 +366,7 @@ def register():
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
+
+
+
