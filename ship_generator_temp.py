@@ -1039,19 +1039,22 @@ def rebuild_ship_mesh(obj):
     ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h)
 
     # Post-boolean additions: Railings and Mast (placed in a separate object to avoid exact solver bugs)
-
-    # --- STAIRS OBJECT ---
-    stair_name = obj.name + "_Escaleras"
-    stair_obj = bpy.data.objects.get(stair_name)
+    rail_name = obj.name + "_Accesorios"
+    rail_obj = bpy.data.objects.get(rail_name)
     
-    if getattr(props, 'generate_stairs', False):
-        if not stair_obj:
-            smesh = bpy.data.meshes.new(stair_name)
-            stair_obj = bpy.data.objects.new(stair_name, smesh)
-            bpy.context.collection.objects.link(stair_obj)
-            stair_obj.parent = obj
+    if getattr(props, 'generate_railings', False) or getattr(props, 'has_mast', False) or getattr(props, 'generate_stairs', False):
+        if not rail_obj:
+            rmesh = bpy.data.meshes.new(rail_name)
+            rail_obj = bpy.data.objects.new(rail_name, rmesh)
+            bpy.context.collection.objects.link(rail_obj)
+            rail_obj.parent = obj
             
-        bm_stairs = bmesh.new()
+        bm_final = bmesh.new()
+        
+        mast_td_z = ft
+        if props.generate_top_deck:
+            mast_td_z = h - 2.0
+            
         if getattr(props, 'generate_stairs', False):
             y_start = l2 if props.section_type == 'STERN' else -l2
             y_dir = -1.0 if props.section_type == 'STERN' else 1.0
@@ -1118,50 +1121,25 @@ def rebuild_ship_mesh(obj):
                         
                     pts.append((pts[-1][0], z_start))
                     
-                    verts_left = [bm_stairs.verts.new(xform(-stair_w2, p[0], p[1])) for p in pts]
-                    verts_right = [bm_stairs.verts.new(xform(stair_w2, p[0], p[1])) for p in pts]
+                    verts_left = [bm_final.verts.new(xform(-stair_w2, p[0], p[1])) for p in pts]
+                    verts_right = [bm_final.verts.new(xform(stair_w2, p[0], p[1])) for p in pts]
                     
                     if y_dir_stair > 0:
-                        bm_stairs.faces.new(verts_left)
-                        bm_stairs.faces.new(tuple(reversed(verts_right)))
+                        bm_final.faces.new(verts_left)
+                        bm_final.faces.new(tuple(reversed(verts_right)))
                     else:
-                        bm_stairs.faces.new(tuple(reversed(verts_left)))
-                        bm_stairs.faces.new(verts_right)
+                        bm_final.faces.new(tuple(reversed(verts_left)))
+                        bm_final.faces.new(verts_right)
                         
                     for i in range(len(pts)):
                         i_next = (i + 1) % len(pts)
                         if y_dir_stair > 0:
-                            bm_stairs.faces.new((verts_left[i], verts_right[i], verts_right[i_next], verts_left[i_next]))
+                            bm_final.faces.new((verts_left[i], verts_right[i], verts_right[i_next], verts_left[i_next]))
                         else:
-                            bm_stairs.faces.new((verts_left[i], verts_left[i_next], verts_right[i_next], verts_right[i]))
+                            bm_final.faces.new((verts_left[i], verts_left[i_next], verts_right[i_next], verts_right[i]))
 
 
 
-
-        bm_stairs.normal_update()
-        stair_obj.data.clear_geometry()
-        bm_stairs.to_mesh(stair_obj.data)
-        bm_stairs.free()
-    else:
-        if stair_obj:
-            bpy.data.objects.remove(stair_obj, do_unlink=True)
-            
-    rail_name = obj.name + "_Accesorios"
-    rail_obj = bpy.data.objects.get(rail_name)
-    
-    if getattr(props, 'generate_railings', False) or getattr(props, 'has_mast', False):
-        if not rail_obj:
-            rmesh = bpy.data.meshes.new(rail_name)
-            rail_obj = bpy.data.objects.new(rail_name, rmesh)
-            bpy.context.collection.objects.link(rail_obj)
-            rail_obj.parent = obj
-            
-        bm_final = bmesh.new()
-        
-        mast_td_z = ft
-        if props.generate_top_deck:
-            mast_td_z = h - 2.0
-            
         if getattr(props, 'generate_railings', False):
             rh = getattr(props, 'railing_height', 12.0)
             rt = getattr(props, 'railing_thickness', 2.5)
@@ -1799,6 +1777,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     if deck_cutter_obj:
         bpy.data.objects.remove(deck_cutter_obj, do_unlink=True)
     
+
 
 
 
