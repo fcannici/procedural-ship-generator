@@ -249,7 +249,10 @@ class OBJECT_OT_add_ship_stair(bpy.types.Operator):
                 for key in source_stair.bl_rna.properties.keys():
                     if key not in ('rna_type', 'name'):
                         try:
-                            setattr(new_stair, key, getattr(source_stair, key))
+                            if key == 'offset_x':
+                                setattr(new_stair, key, -getattr(source_stair, key))
+                            else:
+                                setattr(new_stair, key, getattr(source_stair, key))
                         except Exception:
                             pass
                             
@@ -305,7 +308,10 @@ class OBJECT_OT_add_ship_accessory(bpy.types.Operator):
                 for key in source_acc.bl_rna.properties.keys():
                     if key not in ('rna_type', 'name'):
                         try:
-                            setattr(new_acc, key, getattr(source_acc, key))
+                            if key == 'offset_x':
+                                setattr(new_acc, key, -getattr(source_acc, key))
+                            else:
+                                setattr(new_acc, key, getattr(source_acc, key))
                         except Exception:
                             pass
                             
