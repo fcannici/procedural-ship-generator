@@ -18,12 +18,11 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
             obj = obj.parent
         if obj is not None and obj.type == 'MESH' and hasattr(obj, "ship_generator"):
             props = obj.ship_generator
-
-        if hasattr(context.scene, 'ship_generator_error') and context.scene.ship_generator_error:
-            err_box = layout.box()
-            err_box.alert = True
-            err_box.label(text="CRITICAL SCRIPT ERROR:", icon='ERROR')
-            err_box.label(text=context.scene.ship_generator_error)
+            if hasattr(context.scene, 'ship_generator_error') and context.scene.ship_generator_error:
+                err_box = layout.box()
+                err_box.alert = True
+                err_box.label(text="CRITICAL SCRIPT ERROR:", icon='ERROR')
+                err_box.label(text=context.scene.ship_generator_error)
             
 
             if props.is_ship:
