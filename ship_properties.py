@@ -270,10 +270,12 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         name="Raza Creadora",
         description="Escala las proporciones arquitectónicas (no la cuadrícula) según la raza",
         items=[
-            ('HALFLING', "Medianos/Gnomos (0.75x)", "Arquitectura pequeña"),
-            ('HUMAN', "Humanos/Elfos (1.0x)", "Arquitectura estándar"),
-            ('GIANT', "Gigantes/Goliaths (1.5x)", "Arquitectura grande"),
-            ('TITAN', "Titanes (2.0x)", "Arquitectura colosal")
+            ('SMALL', "Mediano / Aasimar Peq. (25mm)", "Escala 0.68x"),
+            ('GNOME', "Gnomo (27mm)", "Escala 0.73x"),
+            ('DWARF', "Enano (32mm)", "Escala 0.86x"),
+            ('HUMAN', "Humano / Elfo (37mm)", "Escala 1.0x base"),
+            ('LARGE', "SemiOrco / Tiefling (40mm)", "Escala 1.08x"),
+            ('GOLIATH', "Goliath (42mm)", "Escala 1.14x")
         ],
         default='HUMAN',
         update=update_no_sync

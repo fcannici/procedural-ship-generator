@@ -9,9 +9,14 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         
-        layout.operator("object.generate_ship_section", text="Agregar Sección Extra (Centro)", icon='MESH_CUBE')
-        layout.operator("object.generate_full_ship", text="Generar Barco Inicial (3 Partes)", icon='GROUP')
-        layout.operator("object.generate_connector_clip", text="Generar Clip de Unión", icon='LINKED')
+        box_init = layout.box()
+        box_init.label(text="Configuración Inicial", icon='PREFERENCES')
+        if hasattr(context.scene, 'ship_default_race'):
+            box_init.prop(context.scene, "ship_default_race")
+        
+        box_init.operator("object.generate_ship_section", text="Agregar Sección Extra (Centro)", icon='MESH_CUBE')
+        box_init.operator("object.generate_full_ship", text="Generar Barco Inicial (3 Partes)", icon='GROUP')
+        box_init.operator("object.generate_connector_clip", text="Generar Clip de Unión", icon='LINKED')
         
         obj = context.active_object
         if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
@@ -188,6 +193,10 @@ class OBJECT_OT_generate_ship_section(bpy.types.Operator):
         
         # Mark it as a ship
         obj.ship_generator.is_ship = True
+        
+        # Apply default race
+        if hasattr(context.scene, 'ship_default_race'):
+            obj.ship_generator.creator_race = context.scene.ship_default_race
         
         # Inherit settings from an existing ship piece if one exists
         existing = [o for o in context.view_layer.objects if o != obj and hasattr(o, 'ship_generator') and o.ship_generator.is_ship]
@@ -369,6 +378,10 @@ class OBJECT_OT_generate_full_ship(bpy.types.Operator):
             obj.ship_generator.is_ship = True
             obj.ship_generator.section_type = stype
             obj.location = (0, y_offset, 0)
+            
+            if hasattr(context.scene, 'ship_default_race'):
+                obj.ship_generator.creator_race = context.scene.ship_default_race
+                
             rebuild_ship_mesh(obj)
             return obj
             
