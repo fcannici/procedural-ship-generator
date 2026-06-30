@@ -665,6 +665,9 @@ def rebuild_ship_mesh(obj):
                     add_solid_plug(l2 - props.wall_thickness, l2, min_z=base_h)
                 else:
                     add_solid_plug(l2 - props.wall_thickness, l2, min_z=h - 10.0)
+            if getattr(props, 'bodega_closed_front', False):
+                add_solid_plug(l2 - props.wall_thickness, l2, max_z=base_h)
+                
         elif props.section_type == 'BOW':
             add_solid_plug(l2 - props.wall_thickness, l2) # Tip plug (FRONT, always closed)
             if props.has_forecastle:
@@ -673,6 +676,14 @@ def rebuild_ship_mesh(obj):
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=base_h)
                 else:
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=h - 10.0)
+            if getattr(props, 'bodega_closed_back', False):
+                add_solid_plug(-l2, -l2 + props.wall_thickness, max_z=base_h)
+                
+        elif props.section_type == 'MID':
+            if getattr(props, 'bodega_closed_front', False):
+                add_solid_plug(l2 - props.wall_thickness, l2, max_z=base_h)
+            if getattr(props, 'bodega_closed_back', False):
+                add_solid_plug(-l2, -l2 + props.wall_thickness, max_z=base_h)
                 
         num_verts = len(verts_coords)
         for s in range(num_segments):
