@@ -198,16 +198,7 @@ class OBJECT_OT_generate_ship_section(bpy.types.Operator):
         if hasattr(context.scene, 'ship_default_race'):
             obj.ship_generator.creator_race = context.scene.ship_default_race
         
-        # Inherit settings from an existing ship piece if one exists
-        existing = [o for o in context.view_layer.objects if o != obj and hasattr(o, 'ship_generator') and o.ship_generator.is_ship]
-        if existing:
-            src = next((o for o in existing if o.ship_generator.section_type == 'MID'), existing[0])
-            for k, v in src.ship_generator.items():
-                if k not in ['name', 'section_type']:
-                    try:
-                        obj.ship_generator[k] = v
-                    except:
-                        pass
+
         
         # Trigger the first generation
         from .ship_generator import rebuild_ship_mesh
@@ -372,15 +363,7 @@ class OBJECT_OT_generate_full_ship(bpy.types.Operator):
             obj = bpy.data.objects.new(name, mesh)
             context.collection.objects.link(obj)
             
-            if source_obj and source_obj.ship_generator.is_ship:
-                # Copy properties
-                for k, v in source_obj.ship_generator.items():
-                    if k not in ['name', 'section_type']:
-                        try:
-                            obj.ship_generator[k] = v
-                        except:
-                            pass
-                            
+
             obj.ship_generator.is_ship = True
             obj.ship_generator.section_type = stype
             obj.location = (0, y_offset, 0)
