@@ -28,6 +28,7 @@ modules = [
 ]
 
 def register():
+    bpy.types.Scene.ship_generator_error = bpy.props.StringProperty(name="Last Error", default="")
     for mod in modules:
         if hasattr(mod, 'register'):
             mod.register()
@@ -35,6 +36,8 @@ def register():
     bpy.types.Object.ship_generator = bpy.props.PointerProperty(type=ship_properties.ShipGeneratorProperties)
 
 def unregister():
+    if hasattr(bpy.types.Scene, 'ship_generator_error'):
+        del bpy.types.Scene.ship_generator_error
     del bpy.types.Object.ship_generator
     
     for mod in reversed(modules):
