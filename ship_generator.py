@@ -261,9 +261,11 @@ def generate_standalone_accessory(acc, ship_obj):
     
     race_scale = 1.0
     if hasattr(props, 'creator_race'):
-        if props.creator_race == 'HALFLING': race_scale = 0.75
-        elif props.creator_race == 'GIANT': race_scale = 1.5
-        elif props.creator_race == 'TITAN': race_scale = 2.0
+        if props.creator_race == 'SMALL': race_scale = 0.68
+        elif props.creator_race == 'GNOME': race_scale = 0.73
+        elif props.creator_race == 'DWARF': race_scale = 0.86
+        elif props.creator_race == 'LARGE': race_scale = 1.08
+        elif props.creator_race == 'GOLIATH': race_scale = 1.14
         
     # Calculate target position based on ship
     h = props.wall_height * race_scale
@@ -376,9 +378,11 @@ def rebuild_ship_mesh(obj):
 
     race_scale = 1.0
     if hasattr(props, 'creator_race'):
-        if props.creator_race == 'HALFLING': race_scale = 0.75
-        elif props.creator_race == 'GIANT': race_scale = 1.5
-        elif props.creator_race == 'TITAN': race_scale = 2.0
+        if props.creator_race == 'SMALL': race_scale = 0.68
+        elif props.creator_race == 'GNOME': race_scale = 0.73
+        elif props.creator_race == 'DWARF': race_scale = 0.86
+        elif props.creator_race == 'LARGE': race_scale = 1.08
+        elif props.creator_race == 'GOLIATH': race_scale = 1.14
         
     grid_size = 25.4
     l2 = (props.tiles_length * grid_size) / 2.0
@@ -1626,9 +1630,11 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
                 
                 race_scale = 1.0
                 if hasattr(props, 'creator_race'):
-                    if props.creator_race == 'HALFLING': race_scale = 0.75
-                    elif props.creator_race == 'GIANT': race_scale = 1.5
-                    elif props.creator_race == 'TITAN': race_scale = 2.0
+                    if props.creator_race == 'SMALL': race_scale = 0.68
+                    elif props.creator_race == 'GNOME': race_scale = 0.73
+                    elif props.creator_race == 'DWARF': race_scale = 0.86
+                    elif props.creator_race == 'LARGE': race_scale = 1.08
+                    elif props.creator_race == 'GOLIATH': race_scale = 1.14
                     
                 s_width = getattr(stair, 'width', 20.0) * race_scale
                 off_x = getattr(stair, 'offset_x', 0.0)
