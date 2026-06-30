@@ -959,18 +959,18 @@ def rebuild_ship_mesh(obj):
                 tol = getattr(props, 'tolerance', 0.2)
                 hole_len = s_length + (tol * 2.0)
                 hole_w = s_width + (tol * 2.0)
-                hole_h = 6.0 
+                hole_h = 20.0
                 
                 cy = y_start + (off_y * y_dir) + (s_length / 2.0 * y_dir_stair)
                 cx = off_x
                 
                 has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
                 if level == 'BODEGA_MAIN':
-                    cz = base_h - 1.0
+                    cz = base_h
                 else:
                     if not has_castle:
                         continue
-                    cz = h - 1.0
+                    cz = h
                 
                 ret = bmesh.ops.create_cube(bm_deck_cutter, size=1.0)
                 bmesh.ops.scale(bm_deck_cutter, vec=(hole_w, hole_len, hole_h), verts=ret['verts'])
@@ -1031,7 +1031,7 @@ def rebuild_ship_mesh(obj):
     rail_name = obj.name + "_Accesorios"
     rail_obj = bpy.data.objects.get(rail_name)
     
-    if getattr(props, 'generate_railings', False) or getattr(props, 'has_mast', False):
+    if getattr(props, 'generate_railings', False) or getattr(props, 'has_mast', False) or getattr(props, 'generate_stairs', False):
         if not rail_obj:
             rmesh = bpy.data.meshes.new(rail_name)
             rail_obj = bpy.data.objects.new(rail_name, rmesh)
@@ -1077,7 +1077,7 @@ def rebuild_ship_mesh(obj):
                         vec = rm_val @ vec
                     return (vec.x + cx_val, vec.y + cy_val, vec.z)
                 
-                has_castle = (props.section_type == 'STERN' and props.has_quarterdeck) or (props.section_type == 'BOW' and props.has_forecastle)
+                has_castle = (props.section_type == 'STERN' and getattr(props, 'has_quarterdeck', False)) or (props.section_type == 'BOW' and getattr(props, 'has_forecastle', False))
                 if level == 'BODEGA_MAIN':
                     z_start = ft
                     target_z = base_h
@@ -1114,18 +1114,18 @@ def rebuild_ship_mesh(obj):
                     verts_right = [bm_final.verts.new(xform(stair_w2, p[0], p[1])) for p in pts]
                     
                     if y_dir_stair > 0:
-                        bm_final.faces.new(tuple(reversed(verts_left)))
-                        bm_final.faces.new(verts_right)
-                    else:
                         bm_final.faces.new(verts_left)
                         bm_final.faces.new(tuple(reversed(verts_right)))
+                    else:
+                        bm_final.faces.new(tuple(reversed(verts_left)))
+                        bm_final.faces.new(verts_right)
                         
                     for i in range(len(pts)):
                         i_next = (i + 1) % len(pts)
                         if y_dir_stair > 0:
-                            bm_final.faces.new((verts_left[i], verts_left[i_next], verts_right[i_next], verts_right[i]))
-                        else:
                             bm_final.faces.new((verts_left[i], verts_right[i], verts_right[i_next], verts_left[i_next]))
+                        else:
+                            bm_final.faces.new((verts_left[i], verts_left[i_next], verts_right[i_next], verts_right[i]))
 
 
 
@@ -1624,6 +1624,12 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
                 if abs(off_y) >= t_wall:
                     continue
                 
+                race_scale = 1.0
+                if hasattr(props, 'creator_race'):
+                    if props.creator_race == 'HALFLING': race_scale = 0.75
+                    elif props.creator_race == 'GIANT': race_scale = 1.5
+                    elif props.creator_race == 'TITAN': race_scale = 2.0
+                    
                 s_width = getattr(stair, 'width', 20.0) * race_scale
                 off_x = getattr(stair, 'offset_x', 0.0)
                 rot_z = getattr(stair, 'rotation_z', 0.0)
@@ -1758,4 +1764,7 @@ def ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h):
     if deck_cutter_obj:
         bpy.data.objects.remove(deck_cutter_obj, do_unlink=True)
     
+
+
+
 

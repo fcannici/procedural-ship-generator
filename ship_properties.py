@@ -48,13 +48,20 @@ def _realign_ship(context):
         current_y -= l
 
 def update_no_sync(self, context):
+    import bpy
     from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
-    if obj and obj.type == 'MESH':
-        try:
-            rebuild_ship_mesh(obj)
-        except Exception as e:
-            print("Error triggering update:", e)
+    if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+        obj = obj.parent
+    if obj is not None and getattr(obj, 'type', '') == 'MESH':
+        def deferred_update():
+            try:
+                rebuild_ship_mesh(obj)
+            except Exception as e:
+                print("Error triggering update:", e)
+            return None
+        if not bpy.app.timers.is_registered(deferred_update):
+            bpy.app.timers.register(deferred_update, first_interval=0.1)
 
 def update_accessory_no_sync(self, context):
     from .ship_generator import rebuild_ship_mesh
@@ -71,42 +78,41 @@ def update_accessory_no_sync(self, context):
     _realign_ship(context)
 
 def update_stair_level(self, context):
-    if self.level == 'MAIN_CASTLE':
-        self.direction = 'OUTWARD'
     update_no_sync(self, context)
 
 def _sync_prop(self, context, prop_name):
     global _updating_all
     from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
-    
+    if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+        obj = obj.parent
+
     if not _updating_all:
         _updating_all = True
         try:
             val = getattr(self, prop_name)
             for other in list(context.view_layer.objects):
-                if other and other != obj and other.type == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
+                if other is not None and getattr(other, 'type', '') == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
                     setattr(other.ship_generator, prop_name, val)
-                    try:
-                        rebuild_ship_mesh(other)
-                    except Exception as e:
-                        import traceback
-                        traceback.print_exc()
-                        def draw(self, context):
-                            self.layout.label(text=f"Error (Sincronizado): {str(e)}")
-                        context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
+                    def deferred_update(tgt=other):
+                        try: rebuild_ship_mesh(tgt)
+                        except: pass
+                        return None
+                    import bpy
+                    if not bpy.app.timers.is_registered(deferred_update):
+                        bpy.app.timers.register(deferred_update, first_interval=0.1)
         finally:
             _updating_all = False
-            
-    if obj and obj.type == 'MESH':
-        try:
-            rebuild_ship_mesh(obj)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            def draw(self, context):
-                self.layout.label(text=f"Error al generar: {str(e)}")
-            context.window_manager.popup_menu(draw, title="Error en Procedural Ship", icon='ERROR')
+
+    if obj is not None and getattr(obj, 'type', '') == 'MESH':
+        def deferred_update_self():
+            try: rebuild_ship_mesh(obj)
+            except: pass
+            return None
+        import bpy
+        if not bpy.app.timers.is_registered(deferred_update_self):
+            bpy.app.timers.register(deferred_update_self, first_interval=0.1)
+
     _realign_ship(context)
 
 def update_tiles_width(self, context): _sync_prop(self, context, 'tiles_width')
@@ -139,7 +145,7 @@ class StairItem(bpy.types.PropertyGroup):
             ('MAIN_CASTLE', "Principal a Castillo", "Conecta la cubierta principal con el castillo (si existe)")
         ],
         default='BODEGA_MAIN',
-        update=update_no_sync
+        update=update_stair_level
     )
     direction: bpy.props.EnumProperty(
         name="Dirección",
@@ -320,6 +326,13 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
     quarterdeck_closed_front: bpy.props.BoolProperty(
         name="Cerrar Castillo de Popa",
         description="Cierra toda la pared frontal del castillo. Si está desactivado, deja un balcón abierto a la cubierta inferior.",
+        default=False,
+        update=update_no_sync
+    )
+    
+    generate_print_supports: bpy.props.BoolProperty(
+        name="Soportes de Impresión",
+        description="Genera soportes diagonales bajo el balcón para impresión 3D sin soportes.",
         default=False,
         update=update_no_sync
     )
@@ -616,3 +629,5 @@ def register():
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
+

@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Procedural Ship Generator",
     "author": "Jarvis",
-    "version": (1, 12, 9),
+    "version": (1, 12, 29),
     "blender": (3, 0, 0),
     "location": "View3D > Sidebar > Procedural Ship",
     "description": "Generador de barcos D&D modulares, paramétricos y listos para FDM.",
@@ -43,3 +43,10 @@ def unregister():
 
 if __name__ == "__main__":
     register()
+
+
+
+
+
+
+

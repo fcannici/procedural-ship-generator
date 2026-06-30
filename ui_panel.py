@@ -14,6 +14,8 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
         layout.operator("object.generate_connector_clip", text="Generar Clip de Unión", icon='LINKED')
         
         obj = context.active_object
+        if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+            obj = obj.parent
         if obj is not None and obj.type == 'MESH' and hasattr(obj, "ship_generator"):
             props = obj.ship_generator
             if props.is_ship:
@@ -48,10 +50,12 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                     box.prop(props, "has_quarterdeck")
                     if props.has_quarterdeck:
                         box.prop(props, "quarterdeck_closed_front")
+                        box.prop(props, "generate_print_supports")
                 elif props.section_type == 'BOW':
                     box.prop(props, "has_forecastle")
                     if props.has_forecastle:
                         box.prop(props, "forecastle_closed_back")
+                        box.prop(props, "generate_print_supports")
                 box.prop(props, "generate_stairs")
                 if props.generate_stairs:
                     # If empty, maybe add one? The user can just click add.
@@ -211,6 +215,9 @@ class OBJECT_OT_add_ship_stair(bpy.types.Operator):
 
     def execute(self, context):
         obj = context.active_object
+        if obj and obj.parent and hasattr(obj.parent, 'ship_generator') and obj.parent.ship_generator.is_ship:
+            obj = obj.parent
+
         if obj and hasattr(obj, 'ship_generator'):
             props = obj.ship_generator
             
@@ -244,6 +251,8 @@ class OBJECT_OT_remove_ship_stair(bpy.types.Operator):
 
     def execute(self, context):
         obj = context.active_object
+        if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+            obj = obj.parent
         if obj and hasattr(obj, 'ship_generator'):
             props = obj.ship_generator
             idx = props.active_stair_idx
@@ -265,6 +274,8 @@ class OBJECT_OT_add_ship_accessory(bpy.types.Operator):
 
     def execute(self, context):
         obj = context.active_object
+        if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+            obj = obj.parent
         if obj and hasattr(obj, 'ship_generator'):
             props = obj.ship_generator
             
@@ -296,6 +307,8 @@ class OBJECT_OT_remove_ship_accessory(bpy.types.Operator):
 
     def execute(self, context):
         obj = context.active_object
+        if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+            obj = obj.parent
         if obj and hasattr(obj, 'ship_generator'):
             props = obj.ship_generator
             idx = props.active_accessory_idx
@@ -314,6 +327,8 @@ class OBJECT_OT_generate_accessory_mesh(bpy.types.Operator):
 
     def execute(self, context):
         obj = context.active_object
+        if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
+            obj = obj.parent
         if obj and hasattr(obj, 'ship_generator'):
             props = obj.ship_generator
             idx = props.active_accessory_idx
