@@ -9,7 +9,7 @@ Este addon para Blender 3.0+ permite generar barcos modulares paramétricos idea
 - **Sincronización Inteligente (Smart Sync):** Al cambiar las proporciones de una pieza, todo el barco se ajusta y realinea automáticamente para mantenerse en perfecta armonía sin colisiones.
 - **Generación Limpia:** Al agregar nuevas secciones sueltas, el sistema genera mallas 100% vírgenes sin heredar propiedades de otros objetos, garantizando que no se arrastren escaleras ni parámetros no deseados.
 - **Cuadrícula Integrada:** Genera automáticamente una cuadrícula esculpida (1 pulgada / 25.4mm) en el suelo para miniaturas.
-- **Escaleras y Accesorios Modulares Simétricos:** Añada múltiples escaleras interiores y accesorios. Use **Shift+Clic** para clonarlos invirtiendo automáticamente su posición (espejado rápido).
+- **Escaleras Independientes y Accesorios Modulares:** Añada múltiples escaleras (generadas como objetos _Escaleras independientes) y accesorios. Use **Shift+Clic** para clonarlos invirtiendo automáticamente su posición (espejado rápido).
 - **Arquitectura Multinivel (Castillos):** Eleve la cubierta de la Proa o la Popa para crear castillos de mando con escaleras integradas, listas para imprimir.
 - **Escala por Raza Creadora:** Escala las alturas de las paredes y proporciones arquitectónicas automáticamente para medianos, humanos, gigantes o titanes (sin desfasar la cuadrícula táctica).
 - **Compartimentación Inferior:** Divida la bodega (nivel inferior) en múltiples habitaciones cerrando sus caras frontales paramétricamente.
@@ -61,3 +61,4 @@ Este addon es **100% procedural**. Esto significa que cada vez que usted mueve u
 
 ## Autor
 Creado con asistencia de J.A.R.V.I.S.
+
