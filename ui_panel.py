@@ -67,7 +67,6 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                     if props.has_forecastle:
                         box.prop(props, "forecastle_closed_back")
                 box.prop(props, "bodega_closed_front")
-                box.prop(props, "bodega_closed_back")
                 box.prop(props, "generate_stairs")
                 if props.generate_stairs:
                     # If empty, maybe add one? The user can just click add.

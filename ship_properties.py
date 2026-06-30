@@ -366,13 +366,6 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
-    bodega_closed_back: bpy.props.BoolProperty(
-        name="Cerrar Bodega Trasera",
-        description="Genera una pared que cierra la bodega por la parte trasera de esta sección",
-        default=False,
-        update=update_no_sync
-    )
-    
     
     has_forecastle: bpy.props.BoolProperty(
         name="Castillo de Proa",
