@@ -49,66 +49,38 @@ def _realign_ship(context):
 
 def update_no_sync(self, context):
     import bpy
-    
-def _safe_rebuild(obj):
-    import bpy
-    try:
-        from .ship_generator import rebuild_ship_mesh
-        _safe_rebuild(obj)
-        if hasattr(bpy.context.scene, 'ship_generator_error'):
-            bpy.context.scene.ship_generator_error = ""
-    except Exception as e:
-        import traceback, sys
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        tb = traceback.extract_tb(exc_traceback)
-        if tb:
-            last_frame = tb[-1]
-            error_str = f"Error in {last_frame.name} (line {last_frame.lineno}): {exc_type.__name__}: {exc_value}"
-        else:
-            error_str = f"{exc_type.__name__}: {exc_value}"
-        print("CRASH IN REBUILD:", error_str)
-        try: bpy.context.scene.ship_generator_error = error_str
-        except: pass
-
+    from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
     if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
         obj = obj.parent
     if obj is not None and getattr(obj, 'type', '') == 'MESH':
         def deferred_update():
             try:
-                _safe_rebuild(obj)
+                rebuild_ship_mesh(obj)
+                if hasattr(bpy.context.scene, 'ship_generator_error'):
+                    bpy.context.scene.ship_generator_error = ""
             except Exception as e:
-                print("Error triggering update:", e)
+                import traceback, sys
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                tb = traceback.extract_tb(exc_traceback)
+                if tb:
+                    last_frame = tb[-1]
+                    error_str = f"Error in {last_frame.name} (line {last_frame.lineno}): {exc_type.__name__}: {exc_value}"
+                else:
+                    error_str = f"{exc_type.__name__}: {exc_value}"
+                print("CRASH IN REBUILD:", error_str)
+                try: bpy.context.scene.ship_generator_error = error_str
+                except: pass
             return None
         if not bpy.app.timers.is_registered(deferred_update):
             bpy.app.timers.register(deferred_update, first_interval=0.1)
 
 def update_accessory_no_sync(self, context):
-    
-def _safe_rebuild(obj):
-    import bpy
-    try:
-        from .ship_generator import rebuild_ship_mesh
-        _safe_rebuild(obj)
-        if hasattr(bpy.context.scene, 'ship_generator_error'):
-            bpy.context.scene.ship_generator_error = ""
-    except Exception as e:
-        import traceback, sys
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        tb = traceback.extract_tb(exc_traceback)
-        if tb:
-            last_frame = tb[-1]
-            error_str = f"Error in {last_frame.name} (line {last_frame.lineno}): {exc_type.__name__}: {exc_value}"
-        else:
-            error_str = f"{exc_type.__name__}: {exc_value}"
-        print("CRASH IN REBUILD:", error_str)
-        try: bpy.context.scene.ship_generator_error = error_str
-        except: pass
-
+    from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
     if obj and obj.type == 'MESH':
         try:
-            _safe_rebuild(obj)
+            rebuild_ship_mesh(obj)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -122,27 +94,7 @@ def update_stair_level(self, context):
 
 def _sync_prop(self, context, prop_name):
     global _updating_all
-    
-def _safe_rebuild(obj):
-    import bpy
-    try:
-        from .ship_generator import rebuild_ship_mesh
-        _safe_rebuild(obj)
-        if hasattr(bpy.context.scene, 'ship_generator_error'):
-            bpy.context.scene.ship_generator_error = ""
-    except Exception as e:
-        import traceback, sys
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        tb = traceback.extract_tb(exc_traceback)
-        if tb:
-            last_frame = tb[-1]
-            error_str = f"Error in {last_frame.name} (line {last_frame.lineno}): {exc_type.__name__}: {exc_value}"
-        else:
-            error_str = f"{exc_type.__name__}: {exc_value}"
-        print("CRASH IN REBUILD:", error_str)
-        try: bpy.context.scene.ship_generator_error = error_str
-        except: pass
-
+    from .ship_generator import rebuild_ship_mesh
     obj = self.id_data
     if obj and obj.parent and hasattr(obj.parent, "ship_generator") and obj.parent.ship_generator.is_ship:
         obj = obj.parent
@@ -155,8 +107,21 @@ def _safe_rebuild(obj):
                 if other is not None and getattr(other, 'type', '') == 'MESH' and hasattr(other, 'ship_generator') and other.ship_generator.is_ship:
                     setattr(other.ship_generator, prop_name, val)
                     def deferred_update(tgt=other):
-                        try: _safe_rebuild(tgt)
-                        except: pass
+                        try:
+                            rebuild_ship_mesh(tgt)
+                            if hasattr(bpy.context.scene, 'ship_generator_error'):
+                                bpy.context.scene.ship_generator_error = ""
+                        except Exception as e:
+                            import traceback, sys
+                            exc_type, exc_value, exc_traceback = sys.exc_info()
+                            tb = traceback.extract_tb(exc_traceback)
+                            if tb:
+                                last_frame = tb[-1]
+                                error_str = f"Error in {last_frame.name} (line {last_frame.lineno}): {exc_type.__name__}: {exc_value}"
+                            else:
+                                error_str = f"{exc_type.__name__}: {exc_value}"
+                            try: bpy.context.scene.ship_generator_error = error_str
+                            except: pass
                         return None
                     import bpy
                     if not bpy.app.timers.is_registered(deferred_update):
@@ -166,7 +131,7 @@ def _safe_rebuild(obj):
 
     if obj is not None and getattr(obj, 'type', '') == 'MESH':
         def deferred_update_self():
-            try: _safe_rebuild(obj)
+            try: rebuild_ship_mesh(obj)
             except: pass
             return None
         import bpy
