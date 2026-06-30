@@ -74,6 +74,8 @@ def update_no_sync(self, context):
             return None
         if not bpy.app.timers.is_registered(deferred_update):
             bpy.app.timers.register(deferred_update, first_interval=0.1)
+            
+    _realign_ship(context)
 
 def update_accessory_no_sync(self, context):
     from .ship_generator import rebuild_ship_mesh
