@@ -717,9 +717,7 @@ def rebuild_ship_mesh(obj):
                 else:
                     add_solid_plug(l2 - props.wall_thickness, l2, min_z=h - 10.0)
                     if getattr(props, 'generate_print_supports', False):
-                        add_arch_plug(l2 - props.wall_thickness, l2, min_z=base_h, max_z=h - 10.0)
-                    if getattr(props, 'generate_print_supports', False):
-                        add_arch_plug(l2 - props.wall_thickness, l2, min_z=base_h, max_z=h - 10.0)
+                        add_arch_plug(l2 - props.wall_thickness, l2, min_z=max(base_h + 5.0, h - 25.0), max_z=h - 10.0)
         elif props.section_type == 'BOW':
             add_solid_plug(l2 - props.wall_thickness, l2) # Tip plug (FRONT, always closed)
             if props.has_forecastle:
@@ -729,9 +727,7 @@ def rebuild_ship_mesh(obj):
                 else:
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=h - 10.0)
                     if getattr(props, 'generate_print_supports', False):
-                        add_arch_plug(-l2, -l2 + props.wall_thickness, min_z=base_h, max_z=h - 10.0)
-                    if getattr(props, 'generate_print_supports', False):
-                        add_arch_plug(-l2, -l2 + props.wall_thickness, min_z=base_h, max_z=h - 10.0)
+                        add_arch_plug(-l2, -l2 + props.wall_thickness, min_z=max(base_h + 5.0, h - 25.0), max_z=h - 10.0)
                 
         num_verts = len(verts_coords)
         for s in range(num_segments):
