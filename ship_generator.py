@@ -653,61 +653,6 @@ def rebuild_ship_mesh(obj):
             for i in range(len(filtered_coords)):
                 bm.faces.new((pb_verts[i], pb_verts[(i+1)%len(filtered_coords)], pf_verts[(i+1)%len(filtered_coords)], pf_verts[i]))
         
-        def add_arch_plug(y_back, y_front, min_z, max_z):
-            p_prog_b = (y_back - (-l2)) / (2 * l2) if l2 > 0 else 0
-            p_prog_f = (y_front - (-l2)) / (2 * l2) if l2 > 0 else 0
-            s_b = scale_back + (scale_front - scale_back) * p_prog_b
-            s_f = scale_back + (scale_front - scale_back) * p_prog_f
-            
-            def get_arch_coord(c):
-                z = c[1]
-                if z > max_z: z_eff = max_z
-                elif z < min_z: z_eff = min_z
-                else: z_eff = z
-                    
-                ix = get_inner_x_at_z(z_eff)
-                offset = z_eff - min_z
-                
-                if c[0] < 0:
-                    ix = -ix + offset
-                    if ix > -0.1: ix = -0.1
-                else:
-                    ix = ix - offset
-                    if ix < 0.1: ix = 0.1
-                    
-                return (ix, z_eff, 0)
-                
-            filtered_coords = []
-            for c in plug_coords:
-                cc = get_arch_coord(c)
-                if not filtered_coords or cc != filtered_coords[-1]:
-                    filtered_coords.append(cc)
-            
-            pb_verts = []
-            for cc in filtered_coords:
-                x = cc[0] * s_b
-                z = cc[1]
-                if x > 0.1: x += 0.1
-                elif x < -0.1: x -= 0.1
-                if z < props.floor_thickness + 0.1: z -= 0.1
-                pb_verts.append(bm.verts.new((x, y_back, z)))
-            
-            pf_verts = []
-            for cc in filtered_coords:
-                x = cc[0] * s_f
-                z = cc[1]
-                if x > 0.1: x += 0.1
-                elif x < -0.1: x -= 0.1
-                if z < props.floor_thickness + 0.1: z -= 0.1
-                pf_verts.append(bm.verts.new((x, y_front, z)))
-            
-            f_pb = bm.faces.new(pb_verts[::-1])
-            f_pf = bm.faces.new(pf_verts)
-            bmesh.ops.triangulate(bm, faces=[f_pb, f_pf])
-            
-            for i in range(len(filtered_coords)):
-                bm.faces.new((pb_verts[i], pb_verts[(i+1)%len(filtered_coords)], pf_verts[(i+1)%len(filtered_coords)], pf_verts[i]))
-        
         if props.section_type == 'STERN':
             add_solid_plug(-l2, -l2 + props.wall_thickness) # Transom plug (REAR, always closed)
             if props.has_quarterdeck:
@@ -716,8 +661,6 @@ def rebuild_ship_mesh(obj):
                     add_solid_plug(l2 - props.wall_thickness, l2, min_z=base_h)
                 else:
                     add_solid_plug(l2 - props.wall_thickness, l2, min_z=h - 10.0)
-                    if getattr(props, 'generate_print_supports', False):
-                        add_arch_plug(l2 - props.wall_thickness, l2, min_z=max(base_h + 5.0, h - 25.0), max_z=h - 10.0)
         elif props.section_type == 'BOW':
             add_solid_plug(l2 - props.wall_thickness, l2) # Tip plug (FRONT, always closed)
             if props.has_forecastle:
@@ -726,8 +669,6 @@ def rebuild_ship_mesh(obj):
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=base_h)
                 else:
                     add_solid_plug(-l2, -l2 + props.wall_thickness, min_z=h - 10.0)
-                    if getattr(props, 'generate_print_supports', False):
-                        add_arch_plug(-l2, -l2 + props.wall_thickness, min_z=max(base_h + 5.0, h - 25.0), max_z=h - 10.0)
                 
         num_verts = len(verts_coords)
         for s in range(num_segments):

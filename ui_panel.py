@@ -57,12 +57,10 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                     box.prop(props, "has_quarterdeck")
                     if props.has_quarterdeck:
                         box.prop(props, "quarterdeck_closed_front")
-                        box.prop(props, "generate_print_supports")
                 elif props.section_type == 'BOW':
                     box.prop(props, "has_forecastle")
                     if props.has_forecastle:
                         box.prop(props, "forecastle_closed_back")
-                        box.prop(props, "generate_print_supports")
                 box.prop(props, "generate_stairs")
                 if props.generate_stairs:
                     # If empty, maybe add one? The user can just click add.
@@ -433,4 +431,5 @@ def register():
 def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
 

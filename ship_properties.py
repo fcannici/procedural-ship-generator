@@ -355,12 +355,6 @@ class ShipGeneratorProperties(bpy.types.PropertyGroup):
         update=update_no_sync
     )
     
-    generate_print_supports: bpy.props.BoolProperty(
-        name="Soportes de Impresión",
-        description="Genera soportes diagonales bajo el balcón para impresión 3D sin soportes.",
-        default=False,
-        update=update_no_sync
-    )
     
     has_forecastle: bpy.props.BoolProperty(
         name="Castillo de Proa",
