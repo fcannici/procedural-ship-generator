@@ -854,7 +854,24 @@ def rebuild_ship_mesh(obj):
                 
             lower_deck_w2_bot = get_inner_x_at_z(lower_z) - tol + deck_offset
             lower_deck_w2_top = get_inner_x_at_z(lower_z + deck_thickness) - tol + deck_offset
-            create_deck_planks(bm_deck, lower_deck_start_y, lower_deck_end_y, lower_deck_w2_bot, lower_deck_w2_top, lower_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2, props.has_grid)
+            
+            deck_lower_name = obj.name + "_Deck_Inferior"
+            deck_lower_obj = bpy.data.objects.get(deck_lower_name)
+            if not deck_lower_obj:
+                deck_lower_mesh = bpy.data.meshes.new(deck_lower_name)
+                deck_lower_obj = bpy.data.objects.new(deck_lower_name, deck_lower_mesh)
+                bpy.context.collection.objects.link(deck_lower_obj)
+                deck_lower_obj.parent = obj
+                deck_lower_obj.matrix_local = mathutils.Matrix.Identity(4)
+                
+            bm_deck_lower = bmesh.new()
+            
+            create_deck_planks(bm_deck_lower, lower_deck_start_y, lower_deck_end_y, lower_deck_w2_bot, lower_deck_w2_top, lower_z, deck_thickness, scale_front_deck, scale_back_deck, props.section_type, l2, props.has_grid)
+            
+            bm_deck_lower.normal_update()
+            deck_lower_obj.data.clear_geometry()
+            bm_deck_lower.to_mesh(deck_lower_obj.data)
+            bm_deck_lower.free()
                     
         # Deck mesh finalization moved to the end after accessories
 
@@ -1026,6 +1043,17 @@ def rebuild_ship_mesh(obj):
             mod_deck.solver = 'EXACT'
             if hasattr(mod_deck, 'use_self'):
                 mod_deck.use_self = True
+                
+        deck_lower_obj = bpy.data.objects.get(obj.name + "_Deck_Inferior")
+        if deck_lower_obj:
+            mod_deck_lower = deck_lower_obj.modifiers.get("DeckCuts")
+            if not mod_deck_lower:
+                mod_deck_lower = deck_lower_obj.modifiers.new("DeckCuts", 'BOOLEAN')
+            mod_deck_lower.operation = 'DIFFERENCE'
+            mod_deck_lower.object = deck_cutter_obj
+            mod_deck_lower.solver = 'EXACT'
+            if hasattr(mod_deck_lower, 'use_self'):
+                mod_deck_lower.use_self = True
     else:
         if deck_cutter_obj:
             bpy.data.objects.remove(deck_cutter_obj, do_unlink=True)
@@ -1034,6 +1062,13 @@ def rebuild_ship_mesh(obj):
             mod_deck = deck_obj.modifiers.get("DeckCuts")
             if mod_deck:
                 deck_obj.modifiers.remove(mod_deck)
+                
+    # Also clean up the lower deck if no castle or no top deck
+    has_castle = (props.section_type == 'STERN' and getattr(props, 'has_quarterdeck', False)) or (props.section_type == 'BOW' and getattr(props, 'has_forecastle', False))
+    if not (props.generate_top_deck and has_castle):
+        deck_lower_obj = bpy.data.objects.get(obj.name + "_Deck_Inferior")
+        if deck_lower_obj:
+            bpy.data.objects.remove(deck_lower_obj, do_unlink=True)
     # ----------------------------
 
     ensure_cutter(obj, props, l2, bot_w2, mid_w2, top_w2, mid_h, h, base_h)
