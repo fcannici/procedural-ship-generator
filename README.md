@@ -32,7 +32,7 @@ Este addon para Blender 3.0+ permite generar barcos modulares paramétricos idea
 
 ### 2. Ajustar Proporciones
 1. Seleccione cualquiera de las secciones del barco (por ejemplo, el Centro).
-2. En el panel, cambie el **"Largo (Casillas)"** o el **"Ancho interno"**.
+2. En el panel, vaya a la sección **"Dimensiones Base"** y cambie el **"Largo (Casillas)"** o el **"Ancho (Casillas)"**.
 3. Verá cómo **todas las secciones** se escalan al unísono y se empujan entre sí para no chocar (Smart Sync).
 
 ### 3. Modificaciones Procedurales vs Manuales (¡Importante!)
@@ -42,7 +42,7 @@ Este addon es **100% procedural**. Esto significa que cada vez que usted mueve u
 
 ### 4. Compartimentación y Castillos
 - **Castillos:** Seleccione la Popa/Proa, active "Castillo de Popa/Proa". Esto eleva la cubierta trasera/delantera.
-- **Habitaciones de Bodega:** Si el barco no tiene cubierta removible (está destapado), active **"Cerrar Bodega Frontal"** en la sección "Arquitectura Multinivel" para crear una pared interna divisoria (Bulkhead) que separe la bodega de una pieza con la pieza adyacente.
+- **Habitaciones de Bodega:** Si el barco no tiene cubierta removible (está destapado), active **"Cerrar Bodega Frontal"** en la sección **"Interiores"** para crear una pared interna divisoria (Bulkhead) que separe la bodega de una pieza con la pieza adyacente.
 
 ### 5. Configurar Escaleras Interiores
 1. Seleccione una sección y haga clic en **"Añadir Escalera"**.
@@ -50,7 +50,7 @@ Este addon es **100% procedural**. Esto significa que cada vez que usted mueve u
 3. **Atajo de Simetría:** Si desea colocar otra escalera idéntica del lado opuesto, haga **Shift + Clic** en "Añadir Escalera". Esto clonará la escalera y multiplicará su posición X por -1, ubicándola perfectamente simétrica.
 
 ### 6. Accesorios Modulares
-1. Vaya a la sección **"Accesorios Modulares"** y pulse **"Añadir Accesorio"**. Al igual que las escaleras, usar **Shift+Clic** lo duplicará del lado opuesto.
+1. Vaya a la sección **"Arquitecturas Multinivel"** y busque la parte de Accesorios Modulares y pulse **"Añadir Accesorio"**. Al igual que las escaleras, usar **Shift+Clic** lo duplicará del lado opuesto.
 2. Elija el tipo (Timón, Mástil Mayor, Bauprés, etc.) y ajústelo sobre la cubierta. Se generará automáticamente un agujero de encastre (snap joint) en el barco (compatible universalmente a 3mm).
 3. Para imprimir el accesorio de forma independiente, pulse **"Extraer Modelo Base (Independiente)"**. Se creará un nuevo objeto suelto listo para exportar.
 
@@ -61,4 +61,5 @@ Este addon es **100% procedural**. Esto significa que cada vez que usted mueve u
 
 ## Autor
 Creado con asistencia de J.A.R.V.I.S.
+
 
