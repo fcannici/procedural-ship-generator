@@ -10,7 +10,7 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
         layout = self.layout
         
         box_init = layout.box()
-        box_init.label(text="Configuración Inicial", icon='PREFERENCES')
+        box_init.label(text="Controles de Generación", icon='PREFERENCES')
         if hasattr(context.scene, 'ship_default_race'):
             box_init.prop(context.scene, "ship_default_race")
         
@@ -29,47 +29,55 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                 err_box.label(text="CRITICAL SCRIPT ERROR:", icon='ERROR')
                 err_box.label(text=context.scene.ship_generator_error)
             
-
             if props.is_ship:
                 
+                # 1. Configuracion Inicial
                 box = layout.box()
-                box.label(text="Dimensiones Base", icon='OBJECT_DATA')
+                box.label(text="Configuración Inicial", icon='PREFERENCES')
                 box.prop(props, "creator_race")
                 box.prop(props, "section_type")
+                box.prop(props, "generate_connector_slot")
+                
+                # 2. Dimensiones Base
+                box = layout.box()
+                box.label(text="Dimensiones Base", icon='OBJECT_DATA')
                 box.prop(props, "tiles_length")
                 box.prop(props, "tiles_width")
                 box.prop(props, "wall_height")
                 
+                # 3. Textura de casco (tablones)
                 box = layout.box()
                 box.label(text="Textura de Casco (Tablones)", icon='TEXTURE')
                 box.prop(props, "plank_height")
                 box.prop(props, "lapstrake_depth")
                 
+                # 4. Arquitecturas multinivel
                 box = layout.box()
-                box.label(text="Textura de Cubierta (Piso)", icon='MATPLANE')
-                box.prop(props, "generate_floor_planks")
-                if props.generate_floor_planks:
-                    box.prop(props, "floor_plank_width")
-                    box.prop(props, "floor_plank_length")
-                    
-                box = layout.box()
-                box.label(text="Conectores Inferiores", icon='LINKED')
-                box.prop(props, "generate_connector_slot")
-                
-                box = layout.box()
-                box.label(text="Arquitectura Multinivel", icon='GROUP_VERTEX')
+                box.label(text="Arquitecturas Multinivel", icon='GROUP_VERTEX')
                 if props.section_type == 'STERN':
                     box.prop(props, "has_quarterdeck")
-                    if props.has_quarterdeck:
-                        box.prop(props, "quarterdeck_closed_front")
                 elif props.section_type == 'BOW':
                     box.prop(props, "has_forecastle")
-                    if props.has_forecastle:
-                        box.prop(props, "forecastle_closed_back")
-                box.prop(props, "bodega_closed_front")
+                    
+                box.prop(props, "generate_top_deck")
+                if props.has_quarterdeck or props.has_forecastle:
+                    box.prop(props, "deck_elevation")
+                
+                box.prop(props, "has_mast")
+                if props.has_mast:
+                    box.prop(props, "mast_diameter")
+                    box.prop(props, "mast_socket_height")
+                    box.prop(props, "mast_y_offset")
+
+                box.prop(props, "generate_railings")
+                if props.generate_railings:
+                    box.prop(props, "railing_height")
+                    box.prop(props, "railing_thickness")
+                    box.prop(props, "railing_offset_inward")
+                    box.prop(props, "railing_spacing")
+                
                 box.prop(props, "generate_stairs")
                 if props.generate_stairs:
-                    # If empty, maybe add one? The user can just click add.
                     row = box.row()
                     row.operator("object.add_ship_stair", text="Añadir Escalera", icon='ADD')
                     row.operator("object.remove_ship_stair", text="Eliminar", icon='REMOVE')
@@ -81,14 +89,6 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                             stair = props.stairs[idx]
                             col = box.column(align=True)
                             col.prop(stair, "level")
-                            col.label(text=f"DEBUG VAL: {stair.level}")
-                            
-                            box.separator()
-                            box.label(text="--- DEBUG ALL STAIRS ---")
-                            for i, s in enumerate(props.stairs):
-                                box.label(text=f"S{i}: level={s.level}, dir={s.direction}")
-                            box.label(text="-----------------------")
-                            
                             col.prop(stair, "direction")
                             col.separator()
                             col.prop(stair, "offset_x")
@@ -96,16 +96,12 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                             col.separator()
                             col.prop(stair, "width")
                             col.prop(stair, "length")
-                
-                # Accesorios Modulares
-                box = layout.box()
+                            
                 box.label(text="Accesorios Modulares", icon='MODIFIER')
-                
                 row = box.row()
                 row.operator("object.add_ship_accessory", text="Añadir Accesorio", icon='ADD')
                 if len(props.accessories) > 0:
                     row.operator("object.remove_ship_accessory", text="", icon='REMOVE')
-                    
                     box.prop(props, "active_accessory_idx", text=f"Accesorio ({len(props.accessories)})")
                     
                     idx = props.active_accessory_idx
@@ -114,45 +110,41 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                         col = box.column(align=True)
                         col.prop(acc, "acc_type")
                         col.prop(acc, "level")
-                        
                         col.separator()
                         col.prop(acc, "offset_x")
                         col.prop(acc, "offset_y")
                         col.prop(acc, "rotation_z")
-                        
                         col.separator()
                         col.prop(acc, "snap_radius")
                         col.prop(acc, "snap_depth")
-                        
                         col.separator()
                         col.operator("object.generate_accessory_mesh", icon='MESH_DATA')
+                
+                # 5. Interiores
+                box = layout.box()
+                box.label(text="Interiores", icon='FACESEL')
+                box.prop(props, "generate_floor_planks")
+                if props.generate_floor_planks:
+                    box.prop(props, "floor_plank_width")
+                    box.prop(props, "floor_plank_length")
                     
-                if props.has_quarterdeck or props.has_forecastle:
-                    box.prop(props, "deck_elevation")
+                box.prop(props, "has_grid")
                 
-                box = layout.box()
-                box.label(text="Barandas", icon='MOD_WIREFRAME')
-                box.prop(props, "generate_railings")
-                if props.generate_railings:
-                    box.prop(props, "railing_height")
-                    box.prop(props, "railing_thickness")
-                    box.prop(props, "railing_offset_inward")
-                    box.prop(props, "railing_spacing")
+                if props.section_type == 'STERN' and props.has_quarterdeck:
+                    box.prop(props, "quarterdeck_closed_front")
+                elif props.section_type == 'BOW' and props.has_forecastle:
+                    box.prop(props, "forecastle_closed_back")
                 
-                box = layout.box()
-                box.label(text="Accesorios Funcionales", icon='MOD_BOOLEAN')
-                box.prop(props, "has_mast")
-                if props.has_mast:
-                    box.prop(props, "mast_diameter")
-                    box.prop(props, "mast_socket_height")
-                    box.prop(props, "mast_y_offset")
+                box.prop(props, "bodega_closed_front")
+                
                 box.prop(props, "has_trapdoor")
                 if props.has_trapdoor:
                     box.prop(props, "trapdoor_size")
                     box.prop(props, "trapdoor_y_offset")
-                
+
+                # 6. Impresiones FDM
                 box = layout.box()
-                box.label(text="Impresión FDM", icon='MESH_DATA')
+                box.label(text="Impresiones FDM", icon='MESH_DATA')
                 box.prop(props, "wall_thickness")
                 box.prop(props, "floor_thickness")
                 box.prop(props, "tolerance")
@@ -162,10 +154,6 @@ class VIEW3D_PT_procedural_ship(bpy.types.Panel):
                 if props.generate_deck_ledge:
                     box.prop(props, "deck_ledge_width")
                 
-                box = layout.box()
-                box.label(text="Interiores", icon='FACESEL')
-                box.prop(props, "has_grid")
-                box.prop(props, "generate_top_deck")
             else:
                 box = layout.box()
                 box.label(text="Configuración del Clip", icon='MODIFIER')
